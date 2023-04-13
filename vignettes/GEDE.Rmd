@@ -1,0 +1,45 @@
+---
+title: "Using GEDE package"
+author: "Xing Qiu, Dongrui Zhong, Jinfeng Zhang"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Using GEDE package}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r init, echo=FALSE, include=FALSE, message=FALSE}
+
+library(knitr)
+library(rmarkdown)
+## set some global options for the R code chunks
+opts_chunk$set(echo=FALSE, message=FALSE, cache=TRUE, warning=FALSE, results='hide', fig.path='results/fig', dpi=300, cache.path='.cache/')
+options(digits=3)
+
+set.seed(3369)
+
+```
+
+
+# Introduction
+
+In this Vignette, we describe the basic usage of the `GEDE` package. This package is designed to ...
+
+# Methods 
+
+TBD.
+
+
+# Simulations
+
+## Case I
+
+
+## Case II
+
+
+
+# Real Data Analysis
+
+

@@ -41,9 +41,12 @@ RobMod <- function(EstObj, Xlist) {
       Xj <- Xlist[[j]]
       muhat2 <- muhat[Xj]; muhat1 <- muhat[-Xj]
       Tk2 <- Tk[Xj,,drop=FALSE]; Tk1 <- Tk[-Xj,,drop=FALSE]
-      ss <- svd(Tk2 %*% .diag2(sqrt(Lk)))
+      Tk1b <- sweep(Tk1, 2, sqrt(Lk), "*")
+      Tk2b <- sweep(Tk2, 2, sqrt(Lk), "*")
+      ss <- svd(Tk2b)
       U <- ss$u; V <- ss$v; dd <- ss$d
-      beta1.j <- Tk1 %*% .diag2(sqrt(Lk)) %*% V %*% .diag2(dd/(dd^2+sigma2)) %*% t(U)
+      ## beta1.j <- Tk1 %*% .diag2(sqrt(Lk)) %*% V %*% .diag2(dd/(dd^2+sigma2)) %*% t(U)
+      beta1.j <- (Tk1b%*%sweep(V, 2, dd/(dd^2+sigma2), "*")) %*% t(U)
       beta0.j <- muhat1 - beta1.j %*% muhat2
       mods[[j]] <- list(beta0=beta0.j, beta1=beta1.j)
     }
@@ -55,12 +58,24 @@ RobMod <- function(EstObj, Xlist) {
 ## several specific applications
 ############################################################
 
-## a multivariate imputation method. Again, note that Ymiss is
-## nxp-dimensional, not pxn dimensional as most gene expression data
-## are.  Note that this function will not work if some samples are
-## completely missing.  It is a good idea to remove samples in Ymiss
-## with too many missing values before applying this function
+## EigenImpute() is a multivariate imputation method. Again, note that
+## Ymiss is nxp-dimensional, not pxn dimensional as most gene
+## expression data are.  Note that this function will not work if some
+## samples are completely missing.  It is a good idea to remove
+## samples in Ymiss with *too many* missing values before applying this
+## function.
+
+## 04/17/2023. A much more memory-efficient algorithm
 EigenImpute <- function(EstObj, Ymiss) {
+  ## if no missing, we just return Ymiss
+  NA.idx <- which(is.na(Ymiss))
+  if (length(NA.idx)==0) {
+    warning("There is no missing value in Ymiss. No imputation is required.")
+    return(Ymiss)
+  }
+  ## 
+  K <- EstObj$K; muhat <- EstObj$muhat
+  Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
   n <- nrow(Ymiss); p <- ncol(Ymiss)
   ## gather the information about locations of non-missing data
   Xlist0 <- apply(Ymiss, 1, function(x) which(!is.na(x)))
@@ -69,20 +84,65 @@ EigenImpute <- function(EstObj, Ymiss) {
   ## we only need to impute for incomplete samples
   incomplete.cases <- which(nx<p)
   Xlist <- Xlist0[incomplete.cases]
-  ## build predictive models
-  mods <- RobMod(EstObj, Xlist)
-  ## use these linear models to predict missing values
-  Y2 <- Ymiss
-  for (i in 1:length(incomplete.cases)){
-    i0 <- incomplete.cases[i]
-    Yi <- Ymiss[i0,]; Xi <- Yi[Xlist[[i]]]
-    NA.idx.i <- which(is.na(Yi))
-    beta0.i <- mods[[i]]$beta0; beta1.i <- mods[[i]]$beta1
-    Yi.hat <- drop(beta0.i + beta1.i %*% Xi)
-    Y2[i0, NA.idx.i] <- Yi.hat
+  ## mumat is a matrix of mean values
+  mumat <- rep(1, n)%*%t(muhat)
+  ## Yc is the centered data to be imputed. Eventually, the returned
+  ## data will be Yc+mumat.
+  Yc <- Ymiss-mumat 
+  if (K==0) {
+    warning("K=0 means all variables are independent therefore the best estimations are marginal means.")
+    Yc[NA.idx] <- 0
+  } else { #K >=1; imputation is nontrivial
+    for (i in 1:length(incomplete.cases)){
+      i0 <- incomplete.cases[i]; Xi <- Xlist[[i]]
+      NA.idx.i <- which(is.na(Yc[i0,]))
+      Yci.nonNA <- Yc[i0,Xi]
+      Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[-Xi,,drop=FALSE]
+      if (K==1) { #a special shortcut
+        d12 <- sum(Tk2^2)
+        beta1.j <- Lk/(d12 + sigma2) * (Tk1 %*% t(Tk2))
+        Yc[i0, NA.idx.i] <- drop(Lk/(d12 + sigma2) * (Tk1 %*% (t(Tk2)%*%Yci.nonNA)))
+      } else { #K>=2
+        Tk1b <- sweep(Tk1, 2, sqrt(Lk), "*")
+        Tk2b <- sweep(Tk2, 2, sqrt(Lk), "*")
+        ss <- svd(Tk2b); U <- ss$u; V <- ss$v; dd <- ss$d
+        Yc[i0, NA.idx.i] <- drop((Tk1b%*%sweep(V, 2, dd/(dd^2+sigma2), "*")) %*% (t(U)%*%Yci.nonNA))
+      }
+    }
   }
-  return(Y2)
+  return(Yc+mumat)
 }
+
+## This is the main wrapper.
+GEDE <- function(Y, Est="auto", nMAD=3, verbose=FALSE, ...) {
+  if (all(Est=="auto")) Est <- RobEst(Y, ...)
+  muhat <- Est$muhat; Tk <- Est$Tk; Lk <- Est$Lk
+  sigma2 <- Est$sigma2; K <- Est$K
+  ## outliers should be defined by Y, not the training data
+  out.idx <- Hampel(Y, nMAD=nMAD)
+  Y.out <- Y; Y.out[out.idx] <- NA
+  Y.imputed <- EigenImpute(Est, Y.out)
+  ## Now conduct enhancement based on auto prediction.
+  if (sigma2==0) {  #no measurement error
+    Xhat <- Y
+  } else if (K==0) { #no useful, sample-specific signal
+    Xhat <- rep(1,n)%*%t(muhat)
+  } else { #the main case
+    Ytilde <- sweep(Y.imputed, 2, muhat)%*%Tk
+    Ltilde <- Lk/(sigma2+Lk)
+    Xhat <- rep(1,n)%*%t(muhat) +Ytilde%*%t(sweep(Tk, 2, Ltilde, "*"))
+  }
+  if (verbose) {
+    ## Add Xhat and out.idx to Est and return Est
+    Est$Xhat <- Xhat; Est$out.idx <- out.idx; Est$NA.idx <- which(is.na(Y))
+    return(Est)
+  } else {
+    return(Xhat)
+  }
+}
+
+
+
 
 ## a way to predict every gene from other genes. Number of covariates
 ## in the training data Y and newY must be the same (sample sizes can

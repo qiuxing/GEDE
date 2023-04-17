@@ -2,28 +2,54 @@
 ## useful auxiliary functions for the EigenImpute method
 ################################################################################
 
+## A convenient function to visualize a matrix
+mplot <- function(mat, ncolor=100, col.min=NULL, col.max=NULL, ...) {
+  mat <- as.matrix(mat)
+  mmin <- min(mat, na.rm=TRUE); mmax <- max(mat, na.rm=TRUE)
+  if (is.null(col.min)) col.min <- mmin
+  if (is.null(col.max)) col.max <- mmax
+  ## 
+  if (col.min<=mmin & col.max<mmax) {
+    breaks <- c(seq(col.min, col.max, length.out=ncolor), mmax)
+  } else if (col.min>mmin & col.max<mmax) {
+    breaks <- c(mmin, seq(col.min, col.max, length.out=ncolor-1), mmax)
+  } else if (col.min>mmin & col.max>=mmax) {
+    breaks <- c(mmin, seq(col.min, col.max, length.out=ncolor))
+  } else { #col.min<=mmin & col.max>=mmax
+    breaks <- seq(col.min, col.max, length.out=ncolor+1)
+  }
+  image(t(mat[nrow(mat):1,]), col=grey(seq(1, 0, length.out=ncolor)),
+        breaks=breaks, xaxt="n", yaxt="n",  bty="n",
+        asp=nrow(mat)/ncol(mat),...)
+}
+
 ## this is a safe replacement for diag(). R's diag() behaves
 ## differently when x is a vector or a single number
 .diag2 <- function(x) diag(x,nrow = length(x))
 
-## El1 when sigma2 == 1.
-.efun <- function(n,p) {
-  ((sqrt(n-2)+sqrt(p))^2 - 1.2065*(sqrt(n-2)+sqrt(p))*(1/sqrt(n-2)+1/sqrt(p))^(1/3))/(n-1)
+## A Hampel filter based on Med +/- 3*MAD criterion for Y_{nxp}.
+Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
+  Ymed <- apply(Y, 2, median, na.rm=TRUE)
+  Ymad <- apply(Y, 2, mad, na.rm=TRUE)
+  absYc <- abs(sweep(Y, 2, Ymed))
+  out.idx <- which(sweep(absYc, 2, nMAD*Ymad)>0, arr.ind=arr.ind)
+  return(out.idx)
 }
 
 
-## the expectation of l_1 when sigma^2_epsilon==1
-.cfun <- function(n,p,k){
-  pstar <- min(p,n-1); enp <- .efun(n,p)
-  return(enp - (k-1)/(pstar-1)*(2*enp-2*p/pstar))
-}
+## outDetectMD <- function(EstObj, Y) {
+##   ## outlier detection, assuming K>1
+##   K <- EstObj$K; muhat <- EstObj$muhat
+##   Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
+##   ResVar <- sapply(1:p, function(i) {
+##     Tk.i <- Tk[i,]; Tk.neg.i <- Tk[-i,]
+##     beta1.i <- mods[[i]]$beta1
+##     drop(Tk.i %*% diag(Lk) %*% ( Tk.i - t(Tk.neg.i)%*% t(beta1.i))) + sigma2
+##   })
+##   out.z <- sweep(newY - Ypred, 2, sqrt(ResVar), "/")
 
-## the *tail* sum of Elk
-.sfun <- function(n,p,K){
-  pstar <- min(p,n-1); enp <- .efun(n,p)
-  return(p - K*enp + K*(K-1)/(pstar*(pstar-1)) *(enp*pstar-p))
-}
 
+## }
 
 ######################################################################
 ## Functions related to estimating eigenvalues of the covariance
@@ -31,34 +57,34 @@
 ######################################################################
 
 ## this function estimates the number of significant PCs.
-K.est <- function(LL, n, p="auto", tol=1e-3){
-  ## if p="auto", assume that length of LL is p
+K.est <- function(lks, n, p="auto", tol=1e-3){
+  ## if p="auto", assume that length of lks is p
   if (p=="auto"){
-    p <- length(LL)
+    p <- length(lks)
   } else {
-    ## otherwise, append zeros to the rest of LL
-    if (p> length(LL)) LL <- c(LL, rep(0, p-length(LL)))
+    ## otherwise, append zeros to the rest of lks
+    if (p> length(lks)) lks <- c(lks, rep(0, p-length(lks)))
   }
-  ## Check if LL is >=0. Gives warning when not all LL is >=0.
-  if (any(LL < 0)){
+  ## Check if lks is >=0. Gives warning when not all lks is >=0.
+  if (any(lks < 0)){
     warning("Some eigenvalues are negative. They are replaced by zeros.")
-    LL <- ifelse(LL<0, 0, LL)
+    lks <- ifelse(lks<0, 0, lks)
   }
   ## Also warns if number of >0 eigenvalues is < min(n,p)
   N <- min(n,p)-1
-  if (sum(LL>0) < N) {
-    warning(paste0("Number of positive eigenvalues is ", sum(LL>0), ", which is less than min(n,p)-1 = ", N, ". I have to use ad hoc workaround to obtain AIC and MDL values, which may not be accurate! "))
+  if (sum(lks>0) < N) {
+    warning(paste0("Number of positive eigenvalues is ", sum(lks>0), ", which is less than min(n,p)-1 = ", N, ". I have to use ad hoc workaround to obtain AIC and MDL values, which may not be accurate! "))
   }
-  ## sort LL
-  LL <- sort(LL, decreasing=TRUE)
+  ## sort lks
+  lks <- sort(lks, decreasing=TRUE)
   ## An ad hoc upper bound. We will not consider eigenvalues with very
   ## small variance.
-  tol <- sum(LL)*tol
-  N2 <- ifelse(min(LL)<tol, which(LL<tol)[1]-2, N)
+  tol <- sum(lks)*tol
+  N2 <- ifelse(min(lks)<tol, which(lks<tol)[1]-2, N)
   ## Now computes some important summary stats
-  gk <- sapply(0:N2, function(k) exp(mean(log(LL[-(1:k)]))))
-  ak <- sapply(0:N2, function(k) mean(LL[-(1:k)]))
-  tk <- sapply(0:N2, function(k) p*((p-k)*sum( (LL[-(1:k)])^2) / sum(LL[-(1:k)])^2 -(1+p/n)) - p/n)
+  gk <- sapply(0:N2, function(k) exp(mean(log(lks[-(1:k)]))))
+  ak <- sapply(0:N2, function(k) mean(lks[-(1:k)]))
+  tk <- sapply(0:N2, function(k) p*((p-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+p/n)) - p/n)
   AICk <- sapply(0:N2, function(k) -2*(p-k)*n*log(gk[k+1]/ak[k+1]) + 2*k*(2*p-k))
   MDLk <- sapply(0:N2, function(k) -(p-k)*n*log(gk[k+1]/ak[k+1]) + 1/2*k*(2*p-k)*log(n))
   REk <- sapply(0:N2, function(k) 1/4*(n/p)^2 * tk[k+1]^2 + 2*(k+1))
@@ -68,59 +94,11 @@ K.est <- function(LL, n, p="auto", tol=1e-3){
          )
 }
 
-
-## eigenvalue estimators. Right now the "simple" method works better
-## than "LBCE".  I plan to improve LBCE in the near future.
-LambdaEst <- function(lks, n, p, K, method=c("simple", "LBCE")) {
-  method <- match.arg(method)
-  pstar <- min(p, n-1)
-  if (method=="simple"){
-    sigma2hat <- pstar/(p*(pstar-K)) *sum(lks[-(1:K)])
-    lambdahat <- lks[1:K]-p/pstar*sigma2hat
-  } else if (method=="LBCE") {
-    sigma2hat <- sum(lks[-(1:K)])/ .sfun(n,p,K)
-    cc <- sapply(1:K, function(k) .cfun(n,p,k))
-    lambdahat <- lks[1:K]-sigma2hat*cc
-  }
-  return(list(lambdahat=lambdahat, sigma2hat=sigma2hat))
-}
-
-
-## InitialEst() is responsible for estimating \mu, the marginal means;
-## and \Sigma^(0), a rough initial estimate of covariance matrix.
-## mvnmle (the mlest() function) does not work very well. It cannot
-## handle high-throughput (p>=50) data and has severe numerical
-## issues. Right now it defaults to the basic estimator.
-InitialEst <- function(Y, method=c("basic", "mvnmle", "softImpute"), ...) {
-  method <- match.arg(method)
-  if (method=="basic") {
-    muhat <- colMeans(Y, na.rm=TRUE)
-    Sigma0 <- cov(Y, use="pairwise.complete.obs")
-  } else if (method=="mvnmle") {
-    mod <- mlest(Y, ...)
-    muhat <- mod$muhat
-    Sigma0 <- mod$sigmahat
-  } else if (method=="softImpute") {
-    stop ("Unavailable at this moment.")
-  } else {
-    stop ("Only basic, mvnmle, and softImpute are currently implemented.")
-  }
-  return(list(muhat=muhat, Sigma0=Sigma0))
-}
-
-## This function takes Sigma0, and re-estimate / decompose it based on
-## the PPCA model.  It returns the eigen-vector matrix (Tk),
-## eigenvalues (Lk), and the variance of iid noise (sigma2).  Note
-## that Y is supposed to be an nxp-dimensional matrix, so a common
-## gene expression matrix has to be transposed to form Y.
-RobEst <- function(Y, method1=c("basic", "mvnmle", "softImpute"), method2=c("simple", "LBCE"), K="auto", ...) {
-  n <- nrow(Y); p <- ncol(Y); p2 <- min(p, n-1)
-  method1 <- match.arg(method1); method2 <- match.arg(method2)
-  ## 1. Initial est.
-  est1 <- InitialEst(Y, method=method1)
-  muhat <- est1$muhat; Sigma0 <- est1$Sigma0
-  ## 2. decomposition of Sigma0
-  ee <- eigen(Sigma0, symmetric=TRUE); lks <- ee$values; Tmat <- ee$vectors
+## ## We assume that Y contains no missing value nor outliers
+SimpleEst <- function(Y, K="auto") {
+  n <- nrow(Y); p <- ncol(Y); pstar <- min(p, n-1)
+  muhat <- colMeans(Y); Yc <- sweep(Y, 2, muhat)
+  ss <- svd(Yc); Tmat <- ss$v; lks <- ss$d^2/(n-1)
   if (K=="auto"){
     K=K.est(lks, n=n, p=p)[["Kstar"]][["REk"]]
   } else if( K<0) {
@@ -130,14 +108,34 @@ RobEst <- function(Y, method1=c("basic", "mvnmle", "softImpute"), method2=c("sim
   if (K==0) {
     warning("Either you or the automatic model selection procedure selected K=0 or , which implies that all variables are independent. No information can be borrowed from other variables, therefore the best prediction is mean imputation. If that's not expected, consider manually select a reasonable K instead.")
     Tk <- Lk <- NA; sigma2 <- mean(lks)
-  } else if (K==p) {
-    Tk <- Tmat; Lk <- lks; sigma2 <- 0
-  } else { # 0<K<p; the main case
+  } else if (K>=pstar) {
+    warning("Your K is greater or equal to min(p,n-1), which implies that sigma2=0.  Consider using a smaller K.")
+    K <- pstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
+  } else { # 0<K<pstar; the main case
     Tk <- Tmat[, 1:K, drop=FALSE]
     ## estimate the first K eigenvalues
-    lk.est <- LambdaEst(lks, n, p, K, method=method2)
-    Lk <- lk.est$lambdahat; sigma2 <- lk.est$sigma2hat
+    sigma2 <- pstar/(p*(pstar-K)) *sum(lks[-(1:K)])
+    Lk <- lks[1:K]-p/pstar*sigma2
   }
-  return(list(muhat=muhat, Tmat=Tmat, lks=lks, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2))
+  return(list(muhat=muhat, lks=lks, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2))
 }
 
+## 04/14/2023. 
+RobEst <- function(Y, K="auto", nMAD=3) {
+  ## 1. Outlier removal
+  out.idx <- Hampel(Y, nMAD=nMAD)
+  Ymiss <- Y; Ymiss[out.idx] <- NA
+  ## 2. Initial parameter estimation based on Yc0
+  Ybar <- colMeans(Ymiss, na.rm=TRUE)
+  Yc0 <- sweep(Ymiss, 2, Ybar)
+  Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NA by 0
+  Est0 <- SimpleEst(Yc0)
+  Est0$muhat <- Ybar #manually add Ybar back to Est0
+  ## 3. 
+  Y1 <- EigenImpute(Est0, Ymiss)
+  ## 4. Second (final) round of parameter estimation
+  Est1 <- SimpleEst(Y1, K=K)
+  ## 5. append some useful information to Est1 before return
+  Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
+  return(Est1)
+}

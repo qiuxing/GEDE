@@ -107,17 +107,21 @@ SimpleEst <- function(Y, K="auto") {
   ## Now we have a nonnegative K
   if (K==0) {
     warning("Either you or the automatic model selection procedure selected K=0 or , which implies that all variables are independent. No information can be borrowed from other variables, therefore the best prediction is mean imputation. If that's not expected, consider manually select a reasonable K instead.")
-    Tk <- Lk <- NA; sigma2 <- mean(lks)
-  } else if (K>=pstar) {
-    warning("Your K is greater or equal to min(p,n-1), which implies that sigma2=0.  Consider using a smaller K.")
-    K <- pstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
-  } else { # 0<K<pstar; the main case
-    Tk <- Tmat[, 1:K, drop=FALSE]
-    ## estimate the first K eigenvalues
-    sigma2 <- pstar/(p*(pstar-K)) *sum(lks[-(1:K)])
-    Lk <- lks[1:K]-p/pstar*sigma2
+    Tk <- Lk <- NA; sigma2 <- mean(lks); PCs <- NA
+  } else { #K >= 1
+    if (K>=pstar) {
+      warning("Your K is greater or equal to min(p,n-1), which implies that sigma2=0.  Consider using a smaller K.")
+      K <- pstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
+    } else { # 0<K<pstar; the main case
+      Tk <- Tmat[, 1:K, drop=FALSE]
+      ## estimate the first K eigenvalues
+      sigma2 <- pstar/(p*(pstar-K)) *sum(lks[-(1:K)])
+      Lk <- lks[1:K]-p/pstar*sigma2
+    }
+    PCs <- Yc%*%Tk
+    rownames(PCs) <- rownames(Y); colnames(PCs) <- paste0("PC", 1:K)
   }
-  return(list(muhat=muhat, lks=lks, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2))
+  return(list(muhat=muhat, lks=lks, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
 }
 
 ## 04/14/2023. 

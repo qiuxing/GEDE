@@ -125,7 +125,7 @@ EigenImpute <- function(EstObj, Ymiss, HD=FALSE, HD.iter=5) {
 
 ## This is the main wrapper.
 GEDE <- function(Y, Est="auto", HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
-  if (all(Est=="auto")) Est <- RobEst(Y, ...)
+  if (identical(Est,"auto")) Est <- RobEst(Y, HD=HD, HD.iter=HD.iter, ...)
   muhat <- Est$muhat; Tk <- Est$Tk; Lk <- Est$Lk
   sigma2 <- Est$sigma2; K <- Est$K
   ## outliers should be defined by Y, not the training data

@@ -1,10 +1,10 @@
 Package: GEDE
 Title: Gene Expression Data Enhancer: Improving the Quality of Gene Expression Data using an Internal Prediction Strategy
-Version: 0.2.0
+Version: 0.2.1
 Author: Xing Qiu, Dongrui Zhong, Jinfeng Zhang
 Description: An introduction, could be 20 lines long.
 Maintainer: Xing Qiu <xing.qiu@gmail.com>
-Depends: R (>= 4.0.0), filling, knitr, rmarkdown
+Depends: R (>= 4.0.0), filling, Rfast, knitr, rmarkdown
 Suggests:  
 VignetteBuilder: knitr
 Imports: 

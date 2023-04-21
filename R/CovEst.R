@@ -57,7 +57,7 @@ Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
 ######################################################################
 
 ## this function estimates the number of significant PCs.
-K.est <- function(lks, n, p="auto", tol=1e-3){
+K.est <- function(lks, n, p="auto", tol=1e-4){
   ## if p="auto", assume that length of lks is p
   if (p=="auto"){
     p <- length(lks)
@@ -80,7 +80,7 @@ K.est <- function(lks, n, p="auto", tol=1e-3){
   ## An ad hoc upper bound. We will not consider eigenvalues with very
   ## small variance.
   tol <- sum(lks)*tol
-  N2 <- ifelse(min(lks)<tol, which(lks<tol)[1]-2, N)
+  N2 <- ifelse(min(lks)<tol, which(lks<tol)[1], N)
   ## Now computes some important summary stats
   gk <- sapply(0:N2, function(k) exp(mean(log(lks[-(1:k)]))))
   ak <- sapply(0:N2, function(k) mean(lks[-(1:k)]))
@@ -95,10 +95,14 @@ K.est <- function(lks, n, p="auto", tol=1e-3){
 }
 
 ## ## We assume that Y contains no missing value nor outliers
-SimpleEst <- function(Y, K="auto") {
-  n <- nrow(Y); p <- ncol(Y); pstar <- min(p, n-1)
+SimpleEst <- function(Y, K="auto", Kmax=50) {
+  n <- nrow(Y); p <- ncol(Y)
+  pstar <- min(p, n-1)
   muhat <- colMeans(Y); Yc <- sweep(Y, 2, muhat)
-  ss <- svd(Yc); Tmat <- ss$v; lks <- ss$d^2/(n-1)
+  ## ss <- svd(Yc)
+  ## Tmat <- ss$v; lks <- ss$d^2/(n-1)
+  ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,pstar), vectors=TRUE, large=TRUE)
+  Tmat <- ss$vectors; lks <- ss$values
   if (K=="auto"){
     K=K.est(lks, n=n, p=p)[["Kstar"]][["REk"]]
   } else if( K<0) {
@@ -125,7 +129,7 @@ SimpleEst <- function(Y, K="auto") {
 }
 
 ## 04/14/2023. 
-RobEst <- function(Y, K="auto", nMAD=3) {
+RobEst <- function(Y, K="auto", Kmax=50, nMAD=3, HD=FALSE, HD.iter=5) {
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
@@ -133,12 +137,12 @@ RobEst <- function(Y, K="auto", nMAD=3) {
   Ybar <- colMeans(Ymiss, na.rm=TRUE)
   Yc0 <- sweep(Ymiss, 2, Ybar)
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NA by 0
-  Est0 <- SimpleEst(Yc0)
+  Est0 <- SimpleEst(Yc0, K=K, Kmax=Kmax)
   Est0$muhat <- Ybar #manually add Ybar back to Est0
   ## 3. 
-  Y1 <- EigenImpute(Est0, Ymiss)
+  Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)
   ## 4. Second (final) round of parameter estimation
-  Est1 <- SimpleEst(Y1, K=K)
+  Est1 <- SimpleEst(Y1, K=K, Kmax=Kmax)
   ## 5. append some useful information to Est1 before return
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
   return(Est1)

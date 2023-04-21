@@ -65,15 +65,16 @@ RobMod <- function(EstObj, Xlist) {
 ## samples in Ymiss with *too many* missing values before applying this
 ## function.
 
-## 04/17/2023. A much more memory-efficient algorithm
-EigenImpute <- function(EstObj, Ymiss) {
+## 04/17/2023. A much more memory-efficient algorithm. HD: an
+## iterative algorithm that runs faster for high-dim data
+EigenImpute <- function(EstObj, Ymiss, HD=FALSE, HD.iter=5) {
   ## if no missing, we just return Ymiss
   NA.idx <- which(is.na(Ymiss))
   if (length(NA.idx)==0) {
     warning("There is no missing value in Ymiss. No imputation is required.")
     return(Ymiss)
   }
-  ## 
+  ##
   K <- EstObj$K; muhat <- EstObj$muhat
   Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
   n <- nrow(Ymiss); p <- ncol(Ymiss)
@@ -88,25 +89,34 @@ EigenImpute <- function(EstObj, Ymiss) {
   mumat <- rep(1, n)%*%t(muhat)
   ## Yc is the centered data to be imputed. Eventually, the returned
   ## data will be Yc+mumat.
-  Yc <- Ymiss-mumat 
+  Yc <- Ymiss-mumat
   if (K==0) {
     warning("K=0 means all variables are independent therefore the best estimations are marginal means.")
     Yc[NA.idx] <- 0
   } else { #K >=1; imputation is nontrivial
-    for (i in 1:length(incomplete.cases)){
-      i0 <- incomplete.cases[i]; Xi <- Xlist[[i]]
-      NA.idx.i <- which(is.na(Yc[i0,]))
-      Yci.nonNA <- Yc[i0,Xi]
-      Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[-Xi,,drop=FALSE]
-      if (K==1) { #a special shortcut
-        d12 <- sum(Tk2^2)
-        beta1.j <- Lk/(d12 + sigma2) * (Tk1 %*% t(Tk2))
-        Yc[i0, NA.idx.i] <- drop(Lk/(d12 + sigma2) * (Tk1 %*% (t(Tk2)%*%Yci.nonNA)))
-      } else { #K>=2
-        Tk1b <- sweep(Tk1, 2, sqrt(Lk), "*")
-        Tk2b <- sweep(Tk2, 2, sqrt(Lk), "*")
-        ss <- svd(Tk2b); U <- ss$u; V <- ss$v; dd <- ss$d
-        Yc[i0, NA.idx.i] <- drop((Tk1b%*%sweep(V, 2, dd/(dd^2+sigma2), "*")) %*% (t(U)%*%Yci.nonNA))
+    if (HD) { #an iterative procedure for high-dim data
+      Yc[NA.idx] <- 0
+      Tkb <- sweep(Tk, 2, Lk/(Lk+sigma2), "*")
+      for (k in 1:HD.iter){
+        Yc2 <- (Yc%*%Tk)%*%t(Tkb)
+        Yc[NA.idx] <- Yc2[NA.idx]
+      }
+    } else {
+      for (i in 1:length(incomplete.cases)){
+        i0 <- incomplete.cases[i]; Xi <- Xlist[[i]]
+        NA.idx.i <- which(is.na(Yc[i0,]))
+        Yci.nonNA <- Yc[i0,Xi]
+        Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[-Xi,,drop=FALSE]
+        if (K==1) { #a special shortcut
+          d12 <- sum(Tk2^2)
+          beta1.j <- Lk/(d12 + sigma2) * (Tk1 %*% t(Tk2))
+          Yc[i0, NA.idx.i] <- drop(Lk/(d12 + sigma2) * (Tk1 %*% (t(Tk2)%*%Yci.nonNA)))
+        } else { #K>=2
+          Tk1b <- sweep(Tk1, 2, sqrt(Lk), "*")
+          Tk2b <- sweep(Tk2, 2, sqrt(Lk), "*")
+          ss <- svd(Tk2b); U <- ss$u; V <- ss$v; dd <- ss$d
+          Yc[i0, NA.idx.i] <- drop((Tk1b%*%sweep(V, 2, dd/(dd^2+sigma2), "*")) %*% (t(U)%*%Yci.nonNA))
+        }
       }
     }
   }
@@ -114,14 +124,14 @@ EigenImpute <- function(EstObj, Ymiss) {
 }
 
 ## This is the main wrapper.
-GEDE <- function(Y, Est="auto", nMAD=3, verbose=FALSE, ...) {
+GEDE <- function(Y, Est="auto", HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
   if (all(Est=="auto")) Est <- RobEst(Y, ...)
   muhat <- Est$muhat; Tk <- Est$Tk; Lk <- Est$Lk
   sigma2 <- Est$sigma2; K <- Est$K
   ## outliers should be defined by Y, not the training data
   out.idx <- Hampel(Y, nMAD=nMAD)
   Y.out <- Y; Y.out[out.idx] <- NA
-  Y.imputed <- EigenImpute(Est, Y.out)
+  Y.imputed <- EigenImpute(Est, Y.out, HD=HD, HD.iter=HD.iter)
   ## Now conduct enhancement based on auto prediction.
   if (sigma2==0) {  #no measurement error
     Xhat <- Y
@@ -185,7 +195,7 @@ GeneGenePred <- function(EstObj, newY, out.detect=FALSE) {
       })
     }
     out.z <- sweep(newY - Ypred, 2, sqrt(ResVar), "/")
-      return(list(Ypred=Ypred, out.z=out.z, ResVar=ResVar))
+    return(list(Ypred=Ypred, out.z=out.z, ResVar=ResVar))
   } else {
     return(Ypred)
   }

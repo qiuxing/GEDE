@@ -127,7 +127,7 @@ EigenImpute <- function(EstObj, Ymiss, HD=FALSE, HD.iter=5) {
 GEDE <- function(Y, Est="auto", HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
   if (identical(Est,"auto")) Est <- RobEst(Y, HD=HD, HD.iter=HD.iter, ...)
   muhat <- Est$muhat; Tk <- Est$Tk; Lk <- Est$Lk
-  sigma2 <- Est$sigma2; K <- Est$K
+  sigma2 <- Est$sigma2; K <- Est$K; n <- nrow(Y)
   ## outliers should be defined by Y, not the training data
   out.idx <- Hampel(Y, nMAD=nMAD)
   Y.out <- Y; Y.out[out.idx] <- NA
@@ -141,6 +141,7 @@ GEDE <- function(Y, Est="auto", HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...)
     Ytilde <- sweep(Y.imputed, 2, muhat)%*%Tk
     Ltilde <- Lk/(sigma2+Lk)
     Xhat <- rep(1,n)%*%t(muhat) +Ytilde%*%t(sweep(Tk, 2, Ltilde, "*"))
+    dimnames(Xhat) <- dimnames(Y)
   }
   if (verbose) {
     ## Add Xhat and out.idx to Est and return Est

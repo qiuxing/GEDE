@@ -103,6 +103,10 @@ SimpleEst <- function(Y, K="auto", Kmax=50) {
   ## Tmat <- ss$v; lks <- ss$d^2/(n-1)
   ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,pstar), vectors=TRUE, large=TRUE)
   Tmat <- ss$vectors; lks <- ss$values
+  ## l.remain is the variance unexplained by the Kmax eigenvalues
+  l.remain <- round(sum(Yc^2)/(n-1)-sum(lks), 4)
+  ## for convenience, output varprops for screeplot
+  varprops <- cumsum(lks)/(sum(lks)+l.remain)
   if (K=="auto"){
     K=K.est(lks, n=n, p=p)[["Kstar"]][["REk"]]
   } else if( K<0) {
@@ -125,7 +129,7 @@ SimpleEst <- function(Y, K="auto", Kmax=50) {
     PCs <- Yc%*%Tk
     rownames(PCs) <- rownames(Y); colnames(PCs) <- paste0("PC", 1:K)
   }
-  return(list(muhat=muhat, lks=lks, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
+  return(list(muhat=muhat, lks=lks, l.remain=l.remain, varprops=varprops, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
 }
 
 ## 04/14/2023. 

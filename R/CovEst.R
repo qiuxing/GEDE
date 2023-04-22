@@ -24,8 +24,6 @@
 ## this function estimates the number of significant PCs.
 K.est <- function(lks, l.remain, n, p, method=c("vprop", "REk"), vprop=.8) {
   method <- match.arg(method)
-  ## otherwise, append zeros to the rest of lks
-  if (p> length(lks)) lks <- c(lks, rep(0, p-length(lks)))
   ## Check if lks are all >=0. Gives warning when not all lks is >=0.
   if (any(lks < 0)) {
     warning("Some eigenvalues are negative. They are replaced by zeros.")
@@ -92,7 +90,7 @@ SimpleEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=1
 }
 
 ## 04/14/2023. 
-RobEst <- function(Y, K="auto", Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
+RobEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
@@ -100,12 +98,13 @@ RobEst <- function(Y, K="auto", Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
   Ybar <- colMeans(Ymiss, na.rm=TRUE)
   Yc0 <- sweep(Ymiss, 2, Ybar)
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NA by 0
-  Est0 <- SimpleEst(Yc0, K=K, Kmax=Kmax)
+  K.method <- match.arg(K.method)
+  Est0 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
   Est0$muhat <- Ybar #manually add Ybar back to Est0
   ## 3. 
   Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)
   ## 4. Second (final) round of parameter estimation
-  Est1 <- SimpleEst(Y1, K=K, Kmax=Kmax)
+  Est1 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
   ## 5. append some useful information to Est1 before return
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
   return(Est1)

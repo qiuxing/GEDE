@@ -89,7 +89,6 @@ SimpleEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=1
   return(list(muhat=muhat, lks=lks, l.remain=l.remain, varprops=varprops, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
 }
 
-## 04/14/2023. 
 RobEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
@@ -104,7 +103,7 @@ RobEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=100,
   ## 3. 
   Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)
   ## 4. Second (final) round of parameter estimation
-  Est1 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
+  Est1 <- SimpleEst(Y1, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
   ## 5. append some useful information to Est1 before return
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
   return(Est1)

@@ -39,8 +39,8 @@ mplot <- function(mat, ncolor=100, col.min=NULL, col.max=NULL, ...) {
 Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
   ## Ymed <- apply(Y, 2, median, na.rm=TRUE)
   ## Ymad <- apply(Y, 2, mad, na.rm=TRUE)
-  Ymed <- colMedians(Y.miss.out, na.rm=TRUE)
-  Ymad <- colMads(Y.miss.out, na.rm=TRUE)
+  Ymed <- colMedians(Y, na.rm=TRUE)
+  Ymad <- colMads(Y, na.rm=TRUE)
   absYc <- abs(sweep(Y, 2, Ymed))
   out.idx <- which(sweep(absYc, 2, nMAD*Ymad)>0, arr.ind=arr.ind)
   return(out.idx)

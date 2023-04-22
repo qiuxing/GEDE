@@ -152,9 +152,6 @@ GEDE <- function(Y, Est="auto", HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...)
   }
 }
 
-
-
-
 ## a way to predict every gene from other genes. Number of covariates
 ## in the training data Y and newY must be the same (sample sizes can
 ## be different)
@@ -202,8 +199,6 @@ GeneGenePred <- function(EstObj, newY, out.detect=FALSE) {
   }
 }
 
-## A fast implementation specifically designed for gene-gene
-## prediction
 
 
 

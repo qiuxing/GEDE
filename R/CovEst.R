@@ -60,7 +60,7 @@ K.est <- function(lks, n, p="auto", tol=1e-4){
 }
 
 ## ## We assume that Y contains no missing value nor outliers
-SimpleEst <- function(Y, K="auto", Kmax=50) {
+SimpleEst <- function(Y, K="auto", Kmax=100) {
   n <- nrow(Y); p <- ncol(Y)
   pstar <- min(p, n-1)
   muhat <- colMeans(Y); Yc <- sweep(Y, 2, muhat)
@@ -98,7 +98,7 @@ SimpleEst <- function(Y, K="auto", Kmax=50) {
 }
 
 ## 04/14/2023. 
-RobEst <- function(Y, K="auto", Kmax=50, nMAD=3, HD=FALSE, HD.iter=5) {
+RobEst <- function(Y, K="auto", Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA

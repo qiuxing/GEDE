@@ -22,46 +22,40 @@
 ######################################################################
 
 ## this function estimates the number of significant PCs.
-K.est <- function(lks, n, p="auto", tol=1e-4){
-  ## if p="auto", assume that length of lks is p
-  if (p=="auto"){
-    p <- length(lks)
-  } else {
-    ## otherwise, append zeros to the rest of lks
-    if (p> length(lks)) lks <- c(lks, rep(0, p-length(lks)))
-  }
-  ## Check if lks is >=0. Gives warning when not all lks is >=0.
-  if (any(lks < 0)){
+K.est <- function(lks, l.remain, n, p, method=c("vprop", "REk"), vprop=.8) {
+  method <- match.arg(method)
+  ## otherwise, append zeros to the rest of lks
+  if (p> length(lks)) lks <- c(lks, rep(0, p-length(lks)))
+  ## Check if lks are all >=0. Gives warning when not all lks is >=0.
+  if (any(lks < 0)) {
     warning("Some eigenvalues are negative. They are replaced by zeros.")
-    lks <- ifelse(lks<0, 0, lks)
-  }
-  ## Also warns if number of >0 eigenvalues is < min(n,p)
-  N <- min(n,p)-1
-  if (sum(lks>0) < N) {
-    warning(paste0("Number of positive eigenvalues is ", sum(lks>0), ", which is less than min(n,p)-1 = ", N, ". I have to use ad hoc workaround to obtain AIC and MDL values, which may not be accurate! "))
+    lks <- replace(lks, lks<0, 0)
   }
   ## sort lks
   lks <- sort(lks, decreasing=TRUE)
-  ## An ad hoc upper bound. We will not consider eigenvalues with very
-  ## small variance.
-  tol <- sum(lks)*tol
-  N2 <- ifelse(min(lks)<tol, which(lks<tol)[1], N)
-  ## Now computes some important summary stats
-  gk <- sapply(0:N2, function(k) exp(mean(log(lks[-(1:k)]))))
-  ak <- sapply(0:N2, function(k) mean(lks[-(1:k)]))
-  tk <- sapply(0:N2, function(k) p*((p-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+p/n)) - p/n)
-  AICk <- sapply(0:N2, function(k) -2*(p-k)*n*log(gk[k+1]/ak[k+1]) + 2*k*(2*p-k))
-  MDLk <- sapply(0:N2, function(k) -(p-k)*n*log(gk[k+1]/ak[k+1]) + 1/2*k*(2*p-k)*log(n))
-  REk <- sapply(0:N2, function(k) 1/4*(n/p)^2 * tk[k+1]^2 + 2*(k+1))
-  stats <- cbind(AICk=AICk, MDLk=MDLk, REk=REk)
-  rownames(stats) <- paste0("K=", 0:N2)
-  return(list(Kstar=c(AICk=which.min(AICk)-1, MDLk=which.min(MDLk)-1, REk=which.min(REk)-1), statistics=stats)
-         )
+  tvar <- sum(lks)+l.remain #total variance
+  if (method=="vprop"){
+    vp <- cumsum(lks)/tvar
+    mvp <- vp[length(vp)] #max varprop
+    if (mvp<vprop) {
+      warning(paste0("The maximum proportion of variance explained is max(varprop)=", round(mvp, 3), ", which is less than the given vprop cutoff, vprop=", vprop, ". As a result, Kstar is set to be the length of lks."))
+      Kstar <- length(lks)
+    } else {
+      Kstar <- which(vp>=vprop)[1]
+    }
+  } else if (method=="REk") {
+    pstar <- min(p, n-1)
+    ## Now compute the REk stats
+    tk <- sapply(0:pstar, function(k) p*((p-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+p/n)) - p/n)
+    REk <- sapply(0:pstar, function(k) 1/4*(n/p)^2 * tk[k+1]^2 + 2*(k+1))
+    Kstar <- which.min(REk)-1
+    return(Kstar)
+  }
 }
 
 ## ## We assume that Y contains no missing value nor outliers
-SimpleEst <- function(Y, K="auto", Kmax=100) {
-  n <- nrow(Y); p <- ncol(Y)
+SimpleEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=100) {
+  n <- nrow(Y); p <- ncol(Y); K.method <- match.arg(K.method)
   pstar <- min(p, n-1)
   muhat <- colMeans(Y); Yc <- sweep(Y, 2, muhat)
   ## ss <- svd(Yc)
@@ -73,7 +67,7 @@ SimpleEst <- function(Y, K="auto", Kmax=100) {
   ## for convenience, output varprops for screeplot
   varprops <- cumsum(lks)/(sum(lks)+l.remain)
   if (K=="auto"){
-    K=K.est(lks, n=n, p=p)[["Kstar"]][["REk"]]
+    K=K.est(lks, l.remain, n=n, p=p, method=K.method, vprop=vprop)
   } else if( K<0) {
     stop("K must be a non-negative integer or auto.")
   }

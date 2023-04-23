@@ -22,7 +22,7 @@
 ######################################################################
 
 ## this function estimates the number of significant PCs.
-K.est <- function(lks, l.remain, n, p, method=c("vprop", "REk"), vprop=.8) {
+K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
   method <- match.arg(method)
   ## Check if lks are all >=0. Gives warning when not all lks is >=0.
   if (any(lks < 0)) {
@@ -52,7 +52,7 @@ K.est <- function(lks, l.remain, n, p, method=c("vprop", "REk"), vprop=.8) {
 }
 
 ## ## We assume that Y contains no missing value nor outliers
-SimpleEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=100) {
+SimpleEst <- function(Y, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
   n <- nrow(Y); p <- ncol(Y); K.method <- match.arg(K.method)
   pstar <- min(p, n-1)
   muhat <- colMeans(Y); Yc <- sweep(Y, 2, muhat)
@@ -89,7 +89,7 @@ SimpleEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=1
   return(list(muhat=muhat, lks=lks, l.remain=l.remain, varprops=varprops, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
 }
 
-RobEst <- function(Y, K="auto", K.method=c("vprop", "REk"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
+RobEst <- function(Y, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA

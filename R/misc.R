@@ -2,6 +2,10 @@
 ## misc. useful functions
 ######################################################################
 
+## total RMSE
+rmse <- function(prediction, truth) sqrt(mean(as.numeric(prediction-truth)^2, na.rm=TRUE)) 
+
+
 ## columnwise RMSE, with an option for scaling.
 colRMSE <- function(prediction, truth, scaled = FALSE) {
   colrmse <- sqrt(colMeans( (prediction -truth)^2, na.rm=TRUE))

@@ -101,13 +101,13 @@ EigenImpute <- function(EstObj, Ymiss, HD=FALSE, HD.iter=5) {
         Yc2 <- (Yc%*%Tk)%*%t(Tkb)
         Yc[NA.idx] <- Yc2[NA.idx]
       }
-    } else {
+    } else { #the slower but more accurate approach
       for (i in 1:length(incomplete.cases)){
         i0 <- incomplete.cases[i]; Xi <- Xlist[[i]]
         NA.idx.i <- which(is.na(Yc[i0,]))
         Yci.nonNA <- Yc[i0,Xi]
         Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[-Xi,,drop=FALSE]
-        if (K==1) { #a special shortcut
+        if (K==1) { #a special computational shortcut
           d12 <- sum(Tk2^2)
           beta1.j <- Lk/(d12 + sigma2) * (Tk1 %*% t(Tk2))
           Yc[i0, NA.idx.i] <- drop(Lk/(d12 + sigma2) * (Tk1 %*% (t(Tk2)%*%Yci.nonNA)))

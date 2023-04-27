@@ -28,31 +28,24 @@ GEDE <- function(Y, Est="auto", HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...)
 }
 
 ## A consistent enhancing interface for several methods
-Enhancer <- function(train, test, method=c("GEDE", "lasso", "lasso2"), predictor.set=seq(1:ncol(train)), ...) {
+Enhancer <- function(train, test, method=c("GEDE", "lasso"), predictors=seq(1:ncol(train)), ...) {
   method <- match.arg(method)
   train <- as.matrix(train); test <- as.matrix(test)
   n <- nrow(train); p <- ncol(train)
   if (method=="GEDE"){
     Est <- RobEst(train, ...)
-    Xpred <- GEDE(test, Est=Est, ...)
+    Xhat <- GEDE(test, Est=Est, ...)
   } else if (method=="lasso"){
-    Xpred <- matrix(0, nrow(test), p)
+    Xhat <- matrix(0, nrow(test), p)
     for (i in 1:p) {
       ## use a five-fold CV to select the best lasso model
-      mod.i <- cv.glmnet(train[,-i], train[,i], type.measure="mse",
+      Xi.idx <- setdiff(predictors, i)
+      mod.i <- cv.glmnet(x=train[,Xi.idx], y=train[,i], type.measure="mse",
                          alpha=1, nfolds=5, ...)
-      Xpred[,i] <- predict(mod.i, s=mod.i$lambda.min, newx=test[,-i])
-    }
-  } else if (method=="lasso2"){
-    Xpred <- matrix(0, nrow(test), p)
-    for (i in 1:p) {
-      ## use a five-fold CV to select the best lasso model
-      mod.i <- cv.glmnet(train[,-i], train[,i], type.measure="mse",
-                         alpha=1, nfolds=5, ...)
-      Xpred[,i] <- predict(mod.i, s=mod.i$lambda.min, newx=test[,-i])
+      Xhat[,i] <- predict(mod.i, s=mod.i$lambda.min, newx=test[,Xi.idx])
     }
   } else {
     stop(paste0("The method you specified, ", method, ", has not been implemented in Enhancer() yet."))
   }
-  return(Xpred)
+  return(Xhat)
 }

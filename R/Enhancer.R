@@ -6,7 +6,7 @@ GEDE <- function(Y, Est="auto", predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, 
   ## outliers should be defined by Y, not the training data
   out.idx <- Hampel(Y, nMAD=nMAD)
   Y.out <- Y; Y.out[out.idx] <- NA
-  Y.imputed <- EigenImpute(Est, Y.out, HD=HD, HD.iter=HD.iter)
+  Y.imputed <- EigenImpute(Est, Y.out, predictors=predictors, HD=HD, HD.iter=HD.iter)
   ## Now conduct enhancement based on auto prediction.
   if (sigma2==0) {  #no measurement error
     Xhat <- Y

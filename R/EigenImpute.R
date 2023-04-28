@@ -67,7 +67,7 @@ RobMod <- function(EstObj, Xlist) {
 
 ## 04/17/2023. A much more memory-efficient algorithm. HD: an
 ## iterative algorithm that runs faster for high-dim data
-EigenImpute <- function(EstObj, Ymiss, HD=FALSE, HD.iter=5) {
+EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5) {
   ## if no missing, we just return Ymiss
   NA.idx <- which(is.na(Ymiss))
   if (length(NA.idx)==0) {
@@ -85,40 +85,42 @@ EigenImpute <- function(EstObj, Ymiss, HD=FALSE, HD.iter=5) {
   ## we only need to impute for incomplete samples
   incomplete.cases <- which(nx<p)
   Xlist <- Xlist0[incomplete.cases]
-  ## mumat is a matrix of mean values
-  mumat <- rep(1, n)%*%t(muhat)
-  ## Yc is the centered data to be imputed. Eventually, the returned
-  ## data will be Yc+mumat.
-  Yc <- Ymiss-mumat
+  ## Yc is the centered data to be imputed
+  Yc <- sweep(Ymiss, 2, muhat)
   if (K==0) {
     warning("K=0 means all variables are independent therefore the best estimations are marginal means.")
     Yc[NA.idx] <- 0
   } else { #K >=1; imputation is nontrivial
     if (HD) { #an iterative procedure for high-dim data
       Yc[NA.idx] <- 0
-      Tkb <- sweep(Tk, 2, Lk/(Lk+sigma2), "*")
+      Tk2 <- Tk[predictors, , drop=FALSE]
+      ss <- svd(sweep(Tk2, 2, sqrt(Lk), "*"))
+      U <- ss$u; V <- ss$v; dd <- ss$d
+      Tktilde <- Tk%*%sweep(V, 1, sqrt(Lk), "*")
+      Utilde <- sweep(U, 2, dd/(sigma2+dd^2), "*")
       for (k in 1:HD.iter){
-        Yc2 <- (Yc%*%Tk)%*%t(Tkb)
-        Yc[NA.idx] <- Yc2[NA.idx]
+        Y2c <- Yc[,predictors,drop=FALSE]
+        Yc[NA.idx] <- ((Y2c%*%Utilde)%*%t(Tktilde))[NA.idx]
       }
     } else { #the slower but more accurate approach
       for (i in 1:length(incomplete.cases)){
-        i0 <- incomplete.cases[i]; Xi <- Xlist[[i]]
+        i0 <- incomplete.cases[i]
+        Xi <- intersect(Xlist[[i]], predictors)
         NA.idx.i <- which(is.na(Yc[i0,]))
-        Yci.nonNA <- Yc[i0,Xi]
-        Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[-Xi,,drop=FALSE]
+        y2c <- Yc[i0,Xi] #this is a vector
+        Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[NA.idx.i,,drop=FALSE]
         if (K==1) { #a special computational shortcut
           d12 <- sum(Tk2^2)
-          beta1.j <- Lk/(d12 + sigma2) * (Tk1 %*% t(Tk2))
-          Yc[i0, NA.idx.i] <- drop(Lk/(d12 + sigma2) * (Tk1 %*% (t(Tk2)%*%Yci.nonNA)))
+          Yc[i0, NA.idx.i] <- Lk/(d12 + sigma2)*sum(Tk2*y2c)*Tk1
         } else { #K>=2
-          Tk1b <- sweep(Tk1, 2, sqrt(Lk), "*")
-          Tk2b <- sweep(Tk2, 2, sqrt(Lk), "*")
-          ss <- svd(Tk2b); U <- ss$u; V <- ss$v; dd <- ss$d
-          Yc[i0, NA.idx.i] <- drop((Tk1b%*%sweep(V, 2, dd/(dd^2+sigma2), "*")) %*% (t(U)%*%Yci.nonNA))
+          ss <- svd(sweep(Tk2, 2, sqrt(Lk), "*"))
+          U <- ss$u; V <- ss$v; dd <- ss$d
+          Tk1tilde <- Tk1%*%sweep(V, 1, sqrt(Lk), "*")
+          Utilde <- sweep(U, 2, dd/(sigma2+dd^2), "*")
+          Yc[i0, NA.idx.i] <- drop(Tk1tilde%*%(t(Utilde)%*%y2c))
         }
       }
     }
   }
-  return(Yc+mumat)
+  return(sweep(Yc, 2, muhat, "+"))
 }

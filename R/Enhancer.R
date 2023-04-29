@@ -65,7 +65,7 @@ Enhancer <- function(train, test, method=c("GEDE", "lasso", "lasso2"), predictor
       gcv.i <- deviance(mod.i)/(nrow(train)-mod.i$df)^2
       best.lambda <- mod.i$lambda[which.min(gcv.i)]
       predict(mod.i, s=best.lambda, newx=test[,Xi.idx])
-    }, mc.cores=mc.ores))
+    }, mc.cores=mc.cores))
   } else {
     stop(paste0("The method you specified, ", method, ", has not been implemented in Enhancer() yet."))
   }

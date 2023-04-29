@@ -4,7 +4,7 @@ Version: 0.2.3
 Author: Xing Qiu, Dongrui Zhong, Jinfeng Zhang
 Description: An introduction, could be 20 lines long.
 Maintainer: Xing Qiu <xing.qiu@gmail.com>
-Depends: R (>= 4.0.0), filling, Rfast, knitr, rmarkdown
+Depends: R (>= 4.0.0), filling, Rfast, knitr, rmarkdown, parallel
 Suggests:  
 VignetteBuilder: knitr
 Imports: 

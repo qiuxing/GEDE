@@ -41,22 +41,31 @@ GEDE <- function(Y, Est="auto", predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, 
 }
 
 ## A consistent enhancing interface for several methods
-Enhancer <- function(train, test, method=c("GEDE", "lasso"), predictors=seq(1:ncol(train)), ...) {
+Enhancer <- function(train, test, method=c("GEDE", "lasso", "lasso2"), predictors=seq(1:ncol(train)), mc.cores=2, ...) {
   method <- match.arg(method)
   train <- as.matrix(train); test <- as.matrix(test)
   n <- nrow(train); p <- ncol(train)
   if (method=="GEDE"){
     Est <- RobEst(train, ...)
     Xhat <- GEDE(test, Est=Est, predictors=predictors, ...)
-  } else if (method=="lasso"){
-    Xhat <- matrix(0, nrow(test), p)
-    for (i in 1:p) {
-      ## use a five-fold CV to select the best lasso model
+  } else if (method=="lasso") {
+    Xhat <- Reduce(cbind, mclapply(1:p, function(i) {
       Xi.idx <- setdiff(predictors, i)
       mod.i <- cv.glmnet(x=train[,Xi.idx], y=train[,i], type.measure="mse",
-                         alpha=1, nfolds=5, ...)
-      Xhat[,i] <- predict(mod.i, s=mod.i$lambda.min, newx=test[,Xi.idx])
-    }
+                         alpha=1, nfolds=5)
+      predict(mod.i, s=mod.i$lambda.min, newx=test[,Xi.idx])
+    }, mc.cores=mc.cores))
+  } else if (method=="lasso2"){ #a "global" CV
+    Xhat <- Reduce(cbind, mclapply(1:p, function(i) {
+      Xi.idx <- setdiff(predictors, i)
+      mod.i <- glmnet(x=train[,Xi.idx], y=train[,i])
+      ## Remarks: (a) the deviance of a Gaussian model is its RSS; (b)
+      ## nrow(train)-mod.i$df is (approximately) the residual degrees of
+      ## freedom; (c) gcv.i actually equals GCV/n
+      gcv.i <- deviance(mod.i)/(nrow(train)-mod.i$df)^2
+      best.lambda <- mod.i$lambda[which.min(gcv.i)]
+      predict(mod.i, s=best.lambda, newx=test[,Xi.idx])
+    }, mc.cores=mc.ores))
   } else {
     stop(paste0("The method you specified, ", method, ", has not been implemented in Enhancer() yet."))
   }

@@ -98,7 +98,7 @@ RobEst <- function(Y, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100,
   Yc0 <- sweep(Ymiss, 2, Ybar)
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NA by 0
   K.method <- match.arg(K.method)
-  Est0 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
+  suppressWarnings( Est0 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
   Est0$muhat <- Ybar #manually add Ybar back to Est0
   ## 3. 
   Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)

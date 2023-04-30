@@ -47,8 +47,8 @@ K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
     tk <- sapply(0:pstar, function(k) p*((p-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+p/n)) - p/n)
     REk <- sapply(0:pstar, function(k) 1/4*(n/p)^2 * tk[k+1]^2 + 2*(k+1))
     Kstar <- which.min(REk)-1
-    return(Kstar)
   }
+  return(Kstar)
 }
 
 ## ## We assume that Y contains no missing value nor outliers

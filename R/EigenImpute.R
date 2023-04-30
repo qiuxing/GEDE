@@ -99,6 +99,8 @@ EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.i
       Tktilde <- Tk%*%sweep(V, 1, sqrt(Lk), "*")
       Utilde <- sweep(U, 2, dd/(sigma2+dd^2), "*")
       for (k in 1:HD.iter){
+        ## We are over computing (the entire Y2c) here. It could be
+        ## done much faster in C.
         Y2c <- Yc[,predictors,drop=FALSE]
         Yc[NA.idx] <- ((Y2c%*%Utilde)%*%t(Tktilde))[NA.idx]
       }

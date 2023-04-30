@@ -95,3 +95,26 @@ createFolds <- function (y, k = 10, list = TRUE, returnTrain = FALSE)
     else out <- foldVector
     out
 }
+
+## limma is a wrapper for eBayes. "v" is a matrix of covariates
+## WITHOUT the intercept.
+limma <- function(gdata, v){
+  v <- as.matrix(v); vn <- colnames(v)
+  if (is.null(vn)) {
+    vn <- paste0("X", 1:ncol(v)); colnames(v) <- vn
+  }
+  ## remove missing samples
+  na.id <- apply(v, 1, function(x) any(is.na(x)))
+  gdata <- gdata[, !na.id]; v <- v[!na.id,,drop=FALSE]
+  design.mat <- cbind(Intercept=1, v)
+  efit <- eBayes(lmFit(gdata, design.mat))
+  betahat <- efit$coefficients
+  colnames(betahat) <- paste0("betahat.", colnames(betahat))
+  tstats=efit$t[,-1, drop=FALSE]
+  colnames(tstats) <- paste0("tstat.", colnames(tstats))
+  pvals <- efit$p.value[,-1, drop=FALSE]
+  colnames(pvals) <- paste0("pvals.", vn)
+  adjP <- matrix(p.adjust(pvals, "BH"), nrow=nrow(pvals))
+  colnames(adjP) <- paste0("adjP.", vn)
+  return(data.frame(betahat, tstats, pvals, adjP))
+}

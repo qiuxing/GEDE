@@ -65,8 +65,8 @@ Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
 RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9){
   Y <- as.matrix(Y); n <- nrow(Y); m <- ncol(Y)
   Ybars <- colMeans(Y, na.rm=TRUE)
-  if (is.null(X)){
-    betahat <- NULL
+  if (is.null(X)){ #just return the intercepts
+    beta0 <- Ybars; betahat <- NULL
   } else { #X is not null
     X <- as.matrix(X); p <- ncol(X)+1
     Xbars <- colMeans(X, na.rm=TRUE)
@@ -89,9 +89,9 @@ RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9){
       V2D2inv <- sweep(V2, 2, o$d[idx], "/")
       betahat <- V2D2inv%*%(t(U2)%*%Yc)
     }
-    rownames(betahat) <- colnames(x); colnames(betahat) <- colnames(Y)
+    rownames(betahat) <- colnames(X); colnames(betahat) <- colnames(Y)
     ## beta0
-    beta0 <- Ybars -t(betahat)%*%Xbars
+    beta0 <- Ybars -drop(t(betahat)%*%Xbars)
   }
   return(rbind(beta0=beta0, betahat))
 }

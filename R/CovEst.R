@@ -51,22 +51,23 @@ K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
   return(Kstar)
 }
 
-## ## We assume that Y contains no missing value nor outliers
-SimpleEst <- function(Y, y.centered=TRUE, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
+## We assume that Y contains no missing value nor outliers. px: DF of
+## the covariates
+SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
   n <- nrow(Y); p <- ncol(Y); K.method <- match.arg(K.method)
-  pstar <- min(p, n-1)
+  pstar <- min(p, n-px)
   if (y.centered) { #Y is already centered
     mumat <- matrix(0, n, p); Yc <- Y
   } else { #we need to center Y
     mumat <- rep(1,n)%*%t(colMeans(Y))
-    Yc <- Y-muhat
+    Yc <- Y-mumat
   }
   ## ss <- svd(Yc)
   ## Tmat <- ss$v; lks <- ss$d^2/(n-1)
   ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,pstar), vectors=TRUE, large=TRUE)
   Tmat <- ss$vectors; lks <- ss$values
   ## l.remain is the variance unexplained by the Kmax eigenvalues
-  l.remain <- round(sum(Yc^2)/(n-1)-sum(lks), 4)
+  l.remain <- round(sum(Yc^2)/(n-px)-sum(lks), 4)
   ## for convenience, output varprops for screeplot
   varprops <- cumsum(lks)/(sum(lks)+l.remain)
   if (K=="auto"){

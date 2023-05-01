@@ -50,7 +50,7 @@ Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
   return(out.idx)
 }
 
-## A robust and fast way to compute X (X'X)^{-1} X'Y for highdim Y. We
+## A robust and fast way to compute beta=(X'X)^{-1} X'Y for highdim Y. We
 ## assume that the intercept must be included, and we use FWL theorem
 ## to conduct the regression in two steps. NAs are permitted in Y and
 ## X. If X==NULL (default, just return colmeans of Y in matrix format.

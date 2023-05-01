@@ -101,7 +101,7 @@ RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vpr
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
   ## 2. Estimate the mean values by a robust and fast regression function
-  mumat <- RobReg(Y, X)
+  mumat <- RobReg(Y, covariates)
   ## 3. Initial parameter estimation based on Yc0
   Yc0 <- Ymiss-mumat
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NAs by 0
@@ -110,7 +110,7 @@ RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vpr
   Est0$mumat <- mumat #manually add mumat back to Est0
   ## 4. Impute missing values 
   Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)
-  mumat <- RobReg(Y1, X)
+  mumat <- RobReg(Y1, covariates)
   Y1c <- Y1-mumat
   ## 5. Second (final) round of parameter estimation
   Est1 <- SimpleEst(Y1c, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)

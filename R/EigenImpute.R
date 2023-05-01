@@ -127,5 +127,5 @@ EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.i
       }
     }
   }
-  return(Yc+muhat)
+  return(Yc+mumat)
 }

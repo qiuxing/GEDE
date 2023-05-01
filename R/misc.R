@@ -63,12 +63,12 @@ Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
 ## to conduct the regression in two steps. NAs are permitted in Y and
 ## X. If X==NULL (default, just return colmeans of Y in matrix format.
 RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9){
-  Y <- as.matrix(Y); n <- nrow(Y)
+  Y <- as.matrix(Y); n <- nrow(Y); m <- ncol(Y)
   Ybars <- colMeans(Y, na.rm=TRUE)
   if (is.null(X)){
-    Yhat <- rep(1,n)%*%t(Ybars)
+    betahat <- NULL
   } else { #X is not null
-    X <- as.matrix(X)
+    X <- as.matrix(X); p <- ncol(X)+1
     Xbars <- colMeans(X, na.rm=TRUE)
     ## center Y, and replace NAs in Yc by 0
     Yc <- sweep(Y, 2, Ybars); Yc <- replace(Yc, is.na(Yc), 0)
@@ -83,15 +83,17 @@ RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9){
     if (length(idx) < ncol(X)) warning("The design matrix is highly collinear. Some very small singular values used in the regression are omitted.")
     ##
     if (length(idx)==0) { #no singular value is left
-      Ychat <- matrix(0, n, ncol(Y))
+      betahat <- matrix(0, p-1, m)
     } else {
-      U <- o$u[, idx, drop=FALSE]
-      Ychat <- U%*%(t(U)%*%Yc)
+      U2 <- o$u[, idx, drop=FALSE]; V2 <- o$v[, idx, drop=FALSE]
+      V2D2inv <- sweep(V2, 2, o$d[idx], "/")
+      betahat <- V2D2inv%*%(t(U2)%*%Yc)
     }
-    ## Add Ybars back
-    Yhat <- sweep(Ychat, 2, Ybars, "+")
+    rownames(betahat) <- colnames(x); colnames(betahat) <- colnames(Y)
+    ## beta0
+    beta0 <- Ybars -t(betahat)%*%Xbars
   }
-  return(Yhat)
+  return(rbind(beta0=beta0, betahat))
 }
 
 ## createFolds function copied from caret

@@ -2,8 +2,16 @@
 ## misc. useful functions
 ######################################################################
 
-## total RMSE
-rmse <- function(prediction, truth) sqrt(mean(as.numeric(prediction-truth)^2, na.rm=TRUE))
+## total or relative RMSE
+rmse <- function(prediction, truth, relative=FALSE) {
+  mse <- mean(as.numeric(prediction-truth)^2, na.rm=TRUE)
+  if (relative) {
+    truth.norm2 <- mean(as.numeric(truth)^2, na.rm=TRUE)
+    return(sqrt(mse/truth.norm2))
+  } else{ #just return the RMSE
+    return(sqrt(mse))
+  }
+}
 
 
 ## columnwise RMSE, with an option for scaling.

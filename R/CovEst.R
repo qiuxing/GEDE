@@ -22,7 +22,7 @@
 ######################################################################
 
 ## this function estimates the number of significant PCs.
-K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
+K.est <- function(lks, l.remain, n, m, method=c("REk", "vprop"), vprop=.8) {
   method <- match.arg(method)
   ## Check if lks are all >=0. Gives warning when not all lks is >=0.
   if (any(lks < 0)) {
@@ -42,10 +42,10 @@ K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
       Kstar <- which(vp>=vprop)[1]
     }
   } else if (method=="REk") {
-    pstar <- min(p, n-1)
+    mstar <- min(p, n-1)
     ## Now compute the REk stats
-    tk <- sapply(0:pstar, function(k) p*((p-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+p/n)) - p/n)
-    REk <- sapply(0:pstar, function(k) 1/4*(n/p)^2 * tk[k+1]^2 + 2*(k+1))
+    tk <- sapply(0:mstar, function(k) m*((m-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+m/n)) - m/n)
+    REk <- sapply(0:mstar, function(k) 1/4*(n/m)^2 * tk[k+1]^2 + 2*(k+1))
     Kstar <- which.min(REk)-1
   }
   return(Kstar)
@@ -54,24 +54,24 @@ K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
 ## We assume that Y contains no missing value nor outliers. px: DF of
 ## the covariates
 SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
-  n <- nrow(Y); p <- ncol(Y); K.method <- match.arg(K.method)
-  pstar <- min(p, n-px)
+  n <- nrow(Y); m <- ncol(Y); K.method <- match.arg(K.method)
+  mstar <- min(m, n-px)
   if (y.centered) { #Y is already centered
-    mumat <- matrix(0, n, p); Yc <- Y
+    mumat <- matrix(0, n, m); Yc <- Y
   } else { #we need to center Y
     mumat <- rep(1,n)%*%t(colMeans(Y))
     Yc <- Y-mumat
   }
   ## ss <- svd(Yc)
   ## Tmat <- ss$v; lks <- ss$d^2/(n-1)
-  ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,pstar), vectors=TRUE, large=TRUE)
+  ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,mstar), vectors=TRUE, large=TRUE)
   Tmat <- ss$vectors; lks <- ss$values
   ## l.remain is the variance unexplained by the Kmax eigenvalues
   l.remain <- round(sum(Yc^2)/(n-px)-sum(lks), 4)
   ## for convenience, output varprops for screeplot
   varprops <- cumsum(lks)/(sum(lks)+l.remain)
   if (K=="auto"){
-    K=K.est(lks, l.remain, n=n, p=p, method=K.method, vprop=vprop)
+    K=K.est(lks, l.remain, n=n, m=m, method=K.method, vprop=vprop)
   } else if( K<0) {
     stop("K must be a non-negative integer or auto.")
   }
@@ -80,14 +80,14 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
     warning("Either you or the automatic model selection procedure selected K=0 or , which implies that all variables are independent. No information can be borrowed from other variables, therefore the best prediction is mean imputation. If that's not expected, consider manually select a reasonable K instead.")
     Tk <- Lk <- NA; sigma2 <- mean(lks); PCs <- NA
   } else { #K >= 1
-    if (K>=pstar) {
+    if (K>=mstar) {
       warning("Your K is greater or equal to min(p,n-1), which implies that sigma2=0.  Consider using a smaller K.")
-      K <- pstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
-    } else { # 0<K<pstar; the main case
+      K <- mstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
+    } else { # 0<K<mstar; the main case
       Tk <- Tmat[, 1:K, drop=FALSE]
       ## estimate the first K eigenvalues
-      sigma2 <- pstar/(p*(pstar-K)) *sum(lks[-(1:K)])
-      Lk <- lks[1:K]-p/pstar*sigma2
+      sigma2 <- mstar/(m*(mstar-K)) *sum(lks[-(1:K)])
+      Lk <- lks[1:K]-m/mstar*sigma2
     }
     PCs <- Yc%*%Tk
     rownames(PCs) <- rownames(Y); colnames(PCs) <- paste0("PC", 1:K)
@@ -97,26 +97,26 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
 
 ## covariates must be numeric
 RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
-  n <- nrow(Y); p <- ncol(Y)
+  n <- nrow(Y); m <- ncol(Y)
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
   ## 2. Estimate the mean values by a robust and fast regression function
-  mumat <- RobReg(Y, covariates)
+  rr0 <- RobReg(Y, covariates, return.Yhat=TRUE)
   ## 3. Initial parameter estimation based on Yc0
-  Yc0 <- Ymiss-mumat
+  Yc0 <- Ymiss-rr0$Yhat
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NAs by 0
   K.method <- match.arg(K.method)
   suppressWarnings( Est0 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
-  Est0$mumat <- mumat #manually add mumat back to Est0
+  Est0$betahat <- rr0$betahat
   ## 4. Impute missing values 
-  Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)
-  mumat <- RobReg(Y1, covariates)
-  Y1c <- Y1-mumat
+  Y1 <- EigenImpute(Est0, Ymiss, covariates=covariates, HD=HD, HD.iter=HD.iter)
+  rr1 <- RobReg(Y1, covariates, return.Yhat=TRUE)
+  Y1c <- Y1-rr1$Yhat
   ## 5. Second (final) round of parameter estimation
   Est1 <- SimpleEst(Y1c, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
   ## 5. append some useful information to Est1 before return
-  Est1$mumat <- mumat
+  Est1$betahat <- rr1$betahat
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
   return(Est1)
 }

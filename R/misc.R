@@ -62,7 +62,7 @@ Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
 ## assume that the intercept must be included, and we use FWL theorem
 ## to conduct the regression in two steps. NAs are permitted in Y and
 ## X. If X==NULL (default, just return colmeans of Y in matrix format.
-RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9){
+RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9, return.Yhat=FALSE){
   Y <- as.matrix(Y); n <- nrow(Y); m <- ncol(Y)
   Ybars <- colMeans(Y, na.rm=TRUE)
   if (is.null(X)){ #just return the intercepts
@@ -93,8 +93,33 @@ RobReg <- function(Y, X=NULL, d.prop=1e-6, dmin=1e-9){
     ## beta0
     beta0 <- Ybars -drop(t(betahat)%*%Xbars)
   }
-  return(rbind(beta0=beta0, betahat))
+  ## combine beta0 with betahat
+  betahat <- rbind(beta0=beta0, betahat)
+  ## compute and return Yhat if return.Yhat=TRUE
+  if (return.Yhat) {
+    if (is.null(X)) {
+      Yhat <- rep(1,n)%*%t(beta0)
+    } else {
+      Yhat <- cbind(1, X)%*%betahat
+    }
+    dimnames(Yhat) <- dimnames(Y)
+    return(list(betahat=betahat, Yhat=Yhat))
+  } else {
+    return(betahat)
+  }
 }
+
+## the predictor for RobReg. newX cannot be NULL.
+predict.RobReg <- function(betahat, newX) {
+  newX <- as.matrix(newX); n <- nrow(newX)
+  if (nrow(betahat)==1) { #only the intercept
+    Yhat <- rep(1,n)%*%t(betahat[1,])
+  } else {
+    Yhat <- cbind(1, newX)%*%betahat
+  }
+  return(Yhat)
+}
+
 
 ## createFolds function copied from caret
 createFolds <- function (y, k = 10, list = TRUE, returnTrain = FALSE)

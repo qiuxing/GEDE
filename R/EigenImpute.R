@@ -70,7 +70,7 @@ RobMod <- function(EstObj, Xlist) {
 
 ## 04/17/2023. A much more memory-efficient algorithm. HD: an
 ## iterative algorithm that runs faster for high-dim data
-EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5) {
+EigenImpute <- function(EstObj, Ymiss, covariates=NULL, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5) {
   ## if no missing, we just return Ymiss
   NA.idx <- which(is.na(Ymiss))
   if (length(NA.idx)==0) {
@@ -78,17 +78,22 @@ EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.i
     return(Ymiss)
   }
   ##
-  K <- EstObj$K; mumat <- EstObj$mumat
+  K <- EstObj$K; betahat <- EstObj$betahat
   Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
-  n <- nrow(Ymiss); p <- ncol(Ymiss)
+  n <- nrow(Ymiss); m <- ncol(Ymiss)
   ## gather the information about locations of non-missing data
   Xlist0 <- apply(Ymiss, 1, function(x) which(!is.na(x)))
   ## nx is the number of non-missing variables for each sample
   nx <- sapply(Xlist0, length)
   ## we only need to impute for incomplete samples
-  incomplete.cases <- which(nx<p)
+  incomplete.cases <- which(nx<m)
   Xlist <- Xlist0[incomplete.cases]
   ## Yc is the centered data to be imputed
+  if (is.null(covariates)) { #only use the intercept
+    mumat <- rep(1,n)%*%t(betahat[1,])
+  } else {
+    mumat <- cbind(1, covariates)%*%betahat
+  }
   Yc <- Ymiss-mumat
   if (K==0) {
     warning("K=0 means all variables are independent therefore the best estimations are marginal means.")

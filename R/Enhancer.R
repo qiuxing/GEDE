@@ -1,12 +1,19 @@
 ## This is the proposed enhancing function
-GEDE <- function(Y, Est="auto", predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
-  if (identical(Est,"auto")) Est <- RobEst(Y, HD=HD, HD.iter=HD.iter, ...)
-  mumat <- Est$mumat; Tk <- Est$Tk; Lk <- Est$Lk
+GEDE <- function(Y, Est="auto", covariates=NULL, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
+  if (identical(Est,"auto")) Est <- RobEst(Y, covariates=covariates, HD=HD, HD.iter=HD.iter, ...)
+  Tk <- Est$Tk; Lk <- Est$Lk
   sigma2 <- Est$sigma2; K <- Est$K; n <- nrow(Y)
+  ## compute the expected values for the test data (Y)
+  betahat <- Est$betahat
+  if (is.null(covariates)) { #only use the intercept
+    mumat <- rep(1,n)%*%t(betahat[1,])
+  } else {
+    mumat <- cbind(1, covariates)%*%betahat
+  }
   ## outliers should be defined by Y, not the training data
   out.idx <- Hampel(Y, nMAD=nMAD)
   Y.out <- Y; Y.out[out.idx] <- NA
-  Y.imputed <- EigenImpute(Est, Y.out, predictors=predictors, HD=HD, HD.iter=HD.iter)
+  Y.imputed <- EigenImpute(Est, Y.out, covariates=covariates, predictors=predictors, HD=HD, HD.iter=HD.iter)
   ## Now conduct enhancement based on auto prediction.
   if (sigma2==0) {  #no measurement error
     Xhat <- Y
@@ -42,12 +49,12 @@ GEDE <- function(Y, Est="auto", predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, 
 Enhancer <- function(train, test, covariates.train=NULL, covariates.test=NULL, method=c("GEDE", "lasso", "lasso2"), predictors=seq(1:ncol(train)), mc.cores=2, ...) {
   method <- match.arg(method)
   train <- as.matrix(train); test <- as.matrix(test)
-  n <- nrow(train); p <- ncol(train)
+  n <- nrow(train); m <- ncol(train)
   if (method=="GEDE"){
     Est <- RobEst(train, covariates=covariates.train, ...)
     Xhat <- GEDE(test, Est=Est, predictors=predictors, ...)
   } else if (method=="lasso") {
-    Xhat <- Reduce(cbind, mclapply(1:p, function(i) {
+    Xhat <- Reduce(cbind, mclapply(1:m, function(i) {
       Xi.idx <- setdiff(predictors, i)
       Xtrain <- cbind(train[,Xi.idx], covariates.train)
       mod.i <- cv.glmnet(x=Xtrain, y=train[,i], type.measure="mse",
@@ -56,7 +63,7 @@ Enhancer <- function(train, test, covariates.train=NULL, covariates.test=NULL, m
       predict(mod.i, s=mod.i$lambda.min, newx=Xtest)
     }, mc.cores=mc.cores))
   } else if (method=="lasso2"){ #a "global" CV
-    Xhat <- Reduce(cbind, mclapply(1:p, function(i) {
+    Xhat <- Reduce(cbind, mclapply(1:m, function(i) {
       Xi.idx <- setdiff(predictors, i)
       Xtrain <- cbind(train[,Xi.idx], covariates.train)
       mod.i <- glmnet(x=Xtrain, y=train[,i])

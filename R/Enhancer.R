@@ -1,5 +1,6 @@
 ## This is the proposed enhancing function
-GEDE <- function(Y, Est, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
+GEDE <- function(Y, Est="auto", predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, nMAD=3, verbose=FALSE, ...) {
+  if (identical(Est,"auto")) Est <- RobEst(Y, HD=HD, HD.iter=HD.iter, ...)
   mumat <- Est$mumat; Tk <- Est$Tk; Lk <- Est$Lk
   sigma2 <- Est$sigma2; K <- Est$K; n <- nrow(Y)
   ## outliers should be defined by Y, not the training data
@@ -36,7 +37,8 @@ GEDE <- function(Y, Est, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, nMAD=3,
   }
 }
 
-## A consistent enhancing interface for several methods
+## A consistent enhancing interface for several methods, using train
+## and test data
 Enhancer <- function(train, test, covariates.train=NULL, covariates.test=NULL, method=c("GEDE", "lasso", "lasso2"), predictors=seq(1:ncol(train)), mc.cores=2, ...) {
   method <- match.arg(method)
   train <- as.matrix(train); test <- as.matrix(test)

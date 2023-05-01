@@ -2,6 +2,9 @@
 ## Below starts the main functions
 ################################################################################
 
+## 05/01/2023. RobMod() needs to be re-written to deal with covariates
+
+
 ## this function produces regression-like linear predictors of Y given
 ## X, based on the initial mean/covariance estimator provided by
 ## RobEst() or a compatible method.  EstObj must be a list that
@@ -75,7 +78,7 @@ EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.i
     return(Ymiss)
   }
   ##
-  K <- EstObj$K; muhat <- EstObj$muhat
+  K <- EstObj$K; mumat <- EstObj$mumat
   Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
   n <- nrow(Ymiss); p <- ncol(Ymiss)
   ## gather the information about locations of non-missing data
@@ -86,7 +89,7 @@ EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.i
   incomplete.cases <- which(nx<p)
   Xlist <- Xlist0[incomplete.cases]
   ## Yc is the centered data to be imputed
-  Yc <- sweep(Ymiss, 2, muhat)
+  Yc <- Ymiss-mumat
   if (K==0) {
     warning("K=0 means all variables are independent therefore the best estimations are marginal means.")
     Yc[NA.idx] <- 0
@@ -124,5 +127,5 @@ EigenImpute <- function(EstObj, Ymiss, predictors=seq(1:ncol(Y)), HD=FALSE, HD.i
       }
     }
   }
-  return(sweep(Yc, 2, muhat, "+"))
+  return(Yc+muhat)
 }

@@ -52,10 +52,15 @@ K.est <- function(lks, l.remain, n, p, method=c("REk", "vprop"), vprop=.8) {
 }
 
 ## ## We assume that Y contains no missing value nor outliers
-SimpleEst <- function(Y, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
+SimpleEst <- function(Y, y.centered=TRUE, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
   n <- nrow(Y); p <- ncol(Y); K.method <- match.arg(K.method)
   pstar <- min(p, n-1)
-  muhat <- colMeans(Y); Yc <- sweep(Y, 2, muhat)
+  if (y.centered) { #Y is already centered
+    mumat <- matrix(0, n, p); Yc <- Y
+  } else { #we need to center Y
+    mumat <- rep(1,n)%*%t(colMeans(Y))
+    Yc <- Y-muhat
+  }
   ## ss <- svd(Yc)
   ## Tmat <- ss$v; lks <- ss$d^2/(n-1)
   ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,pstar), vectors=TRUE, large=TRUE)
@@ -86,25 +91,31 @@ SimpleEst <- function(Y, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=1
     PCs <- Yc%*%Tk
     rownames(PCs) <- rownames(Y); colnames(PCs) <- paste0("PC", 1:K)
   }
-  return(list(muhat=muhat, lks=lks, l.remain=l.remain, varprops=varprops, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
+  return(list(mumat=mumat, lks=lks, l.remain=l.remain, varprops=varprops, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
 }
 
-RobEst <- function(Y, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
+## covariates must be numeric
+RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
+  n <- nrow(Y); p <- ncol(Y)
   ## 1. Outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
-  ## 2. Initial parameter estimation based on Yc0
-  Ybar <- colMeans(Ymiss, na.rm=TRUE)
-  Yc0 <- sweep(Ymiss, 2, Ybar)
-  Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NA by 0
+  ## 2. Estimate the mean values by a robust and fast regression function
+  mumat <- RobReg(Y, X)
+  ## 3. Initial parameter estimation based on Yc0
+  Yc0 <- Ymiss-mumat
+  Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NAs by 0
   K.method <- match.arg(K.method)
   suppressWarnings( Est0 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
-  Est0$muhat <- Ybar #manually add Ybar back to Est0
-  ## 3. 
+  Est0$mumat <- mumat #manually add mumat back to Est0
+  ## 4. Impute missing values 
   Y1 <- EigenImpute(Est0, Ymiss, HD=HD, HD.iter=HD.iter)
-  ## 4. Second (final) round of parameter estimation
-  Est1 <- SimpleEst(Y1, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
+  mumat <- RobReg(Y1, X)
+  Y1c <- Y1-mumat
+  ## 5. Second (final) round of parameter estimation
+  Est1 <- SimpleEst(Y1c, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
   ## 5. append some useful information to Est1 before return
+  Est1$mumat <- mumat
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
   return(Est1)
 }

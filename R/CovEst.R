@@ -53,7 +53,7 @@ K.est <- function(lks, l.remain, n, m, method=c("REk", "vprop"), vprop=.8) {
 
 ## We assume that Y contains no missing value nor outliers. px: DF of
 ## the covariates
-SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100) {
+SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=200) {
   n <- nrow(Y); m <- ncol(Y); K.method <- match.arg(K.method)
   mstar <- min(m, n-px)
   if (y.centered) { #Y is already centered
@@ -96,7 +96,7 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
 }
 
 ## covariates must be numeric
-RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
+RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=200, nMAD=3, HD=FALSE, HD.iter=5) {
   n <- nrow(Y); m <- ncol(Y)
   ## 1. Initial outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)

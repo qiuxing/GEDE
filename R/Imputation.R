@@ -134,3 +134,28 @@ EigenImpute <- function(EstObj, Ymiss, covariates=NULL, predictors=seq(1:ncol(Y)
   }
   return(Yc+mumat)
 }
+
+
+## Methods implemented in filling: softImpute, mean, median, SVT
+imputation <- function(Y, method, Grp=rep(1, nrow(Y)), nMAD=3, lambdas=10) {
+  Grp <- as.character(Grp); G <- unique(Grp)
+  Yimputed <- Y
+  for (g in G) {
+    Yg <- Y[Grp==g,]
+    out.idx <- Hampel(Yg, nMAD=nMAD)
+    Yg[out.idx] <- NA
+    if (method=="softImpute") {
+      Yimputed[Grp==g,] <- fill.SoftImpute(Yg, lambdas=lambdas)$X[,,1]
+    } else if (method=="SVT") {
+      Yimputed[Grp==g,] <- fill.SVT(Yg)$X
+    } else if (method=="mean") {
+      Yimputed[Grp==g,] <- fill.simple(Yg,method="mean")$X
+    } else if (method=="median") {
+      Yimputed[Grp==g,] <- fill.simple(Yg,method="median")$X
+    } else {
+      stop("Your imputation method is not implemented yet.")
+    }
+  }
+  return(Yimputed)
+}
+

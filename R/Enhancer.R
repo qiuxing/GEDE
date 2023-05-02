@@ -10,8 +10,8 @@ GEDE <- function(Y, Est="auto", covariates=NULL, predictors=seq(1:ncol(Y)), HD=F
   } else {
     mumat <- cbind(1, covariates)%*%betahat
   }
-  ## outliers should be defined by Y, not the training data
-  out.idx <- Hampel(Y, nMAD=nMAD)
+  ## outliers should be defined by the centered test data
+  out.idx <- Hampel(Y-mumat, nMAD=nMAD)
   Y.out <- Y; Y.out[out.idx] <- NA
   Y.imputed <- EigenImpute(Est, Y.out, covariates=covariates, predictors=predictors, HD=HD, HD.iter=HD.iter)
   ## Now conduct enhancement based on auto prediction.

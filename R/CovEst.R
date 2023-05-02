@@ -98,7 +98,7 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
 ## covariates must be numeric
 RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=100, nMAD=3, HD=FALSE, HD.iter=5) {
   n <- nrow(Y); m <- ncol(Y)
-  ## 1. Outlier removal
+  ## 1. Initial outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
   ## 2. Estimate the mean values by a robust and fast regression function
@@ -106,17 +106,20 @@ RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vpr
   px <- nrow(rr0$betahat) #number of covariates, including the intercept
   ## 3. Initial parameter estimation based on Yc0
   Yc0 <- Ymiss-rr0$Yhat
+  ## 4. Second round of outlier removal applied to Yc0
+  out.idx2 <- Hampel(Yc0, nMAD=nMAD)
+  Yc0[out.idx2] <- NA
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NAs by 0
   K.method <- match.arg(K.method)
   suppressWarnings( Est0 <- SimpleEst(Yc0, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
   Est0$betahat <- rr0$betahat
-  ## 4. Impute missing values 
+  ## 5. Impute missing values 
   Y1 <- EigenImpute(Est0, Ymiss, covariates=covariates, HD=HD, HD.iter=HD.iter)
   rr1 <- RobReg(Y1, covariates, return.Yhat=TRUE)
   Y1c <- Y1-rr1$Yhat
-  ## 5. Second (final) round of parameter estimation
+  ## 6. Second (final) round of parameter estimation
   Est1 <- SimpleEst(Y1c, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
-  ## 5. append some useful information to Est1 before return
+  ## 7. append some useful information to Est1 before return
   Est1$betahat <- rr1$betahat
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx
   return(Est1)

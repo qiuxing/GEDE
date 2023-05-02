@@ -42,7 +42,7 @@ K.est <- function(lks, l.remain, n, m, method=c("REk", "vprop"), vprop=.8) {
       Kstar <- which(vp>=vprop)[1]
     }
   } else if (method=="REk") {
-    mstar <- min(p, n-1)
+    mstar <- min(m, n-1)
     ## Now compute the REk stats
     tk <- sapply(0:mstar, function(k) m*((m-k)*sum( (lks[-(1:k)])^2) / sum(lks[-(1:k)])^2 -(1+m/n)) - m/n)
     REk <- sapply(0:mstar, function(k) 1/4*(n/m)^2 * tk[k+1]^2 + 2*(k+1))

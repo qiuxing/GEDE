@@ -67,7 +67,7 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
   ss <- hd.eigen(Yc, center=FALSE, scale=FALSE, k=min(Kmax,mstar), vectors=TRUE, large=TRUE)
   Tmat <- ss$vectors; lks <- ss$values
   ## l.remain is the variance unexplained by the Kmax eigenvalues
-  l.remain <- round(sum(Yc^2)/(n-px)-sum(lks), 4)
+  l.remain <- round(sum(Yc^2)/(n-1)-sum(lks), 4)
   ## for convenience, output varprops for screeplot
   varprops <- cumsum(lks)/(sum(lks)+l.remain)
   if (K=="auto"){
@@ -85,8 +85,8 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
       K <- mstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
     } else { # 0<K<mstar; the main case
       Tk <- Tmat[, 1:K, drop=FALSE]
-      ## estimate the first K eigenvalues
-      sigma2 <- mstar/(m*(mstar-K)) *sum(lks[-(1:K)])
+      ## estimate sigma2 and the first K eigenvalues
+      sigma2 <- mstar/(m*(mstar-K)) *(sum(lks[-(1:K)])+l.remain)
       Lk <- lks[1:K]-m/mstar*sigma2
     }
     PCs <- Yc%*%Tk
@@ -103,18 +103,19 @@ RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vpr
   Ymiss <- Y; Ymiss[out.idx] <- NA
   ## 2. Estimate the mean values by a robust and fast regression function
   rr0 <- RobReg(Y, covariates, return.Yhat=TRUE)
+  px <- nrow(rr0$betahat) #number of covariates, including the intercept
   ## 3. Initial parameter estimation based on Yc0
   Yc0 <- Ymiss-rr0$Yhat
   Yc0 <- replace(Yc0, is.na(Yc0), 0) #replace NAs by 0
   K.method <- match.arg(K.method)
-  suppressWarnings( Est0 <- SimpleEst(Yc0, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
+  suppressWarnings( Est0 <- SimpleEst(Yc0, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
   Est0$betahat <- rr0$betahat
   ## 4. Impute missing values 
   Y1 <- EigenImpute(Est0, Ymiss, covariates=covariates, HD=HD, HD.iter=HD.iter)
   rr1 <- RobReg(Y1, covariates, return.Yhat=TRUE)
   Y1c <- Y1-rr1$Yhat
   ## 5. Second (final) round of parameter estimation
-  Est1 <- SimpleEst(Y1c, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
+  Est1 <- SimpleEst(Y1c, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)
   ## 5. append some useful information to Est1 before return
   Est1$betahat <- rr1$betahat
   Est1[["NA.idx"]] <- which(is.na(Y)); Est1[["out.idx"]] <- out.idx

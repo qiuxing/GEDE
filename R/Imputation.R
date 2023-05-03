@@ -137,7 +137,7 @@ EigenImpute <- function(EstObj, Ymiss, covariates=NULL, predictors=seq(1:ncol(Y)
 
 
 ## Methods implemented in filling: softImpute, mean, median, SVT
-imputation <- function(Y, method, Grp=rep(1, nrow(Y)), nMAD=3, lambdas=10) {
+imputation <- function(Y, method, Grp=rep(1, nrow(Y)), nMAD=2, lambdas=10) {
   Grp <- as.character(Grp); G <- unique(Grp)
   Yimputed <- Y
   for (g in G) {

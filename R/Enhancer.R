@@ -52,7 +52,7 @@ Enhancer <- function(train, test, covariates.train=NULL, covariates.test=NULL, m
   n <- nrow(train); m <- ncol(train)
   if (method=="GEDE"){
     Est <- RobEst(train, covariates=covariates.train, ...)
-    Xhat <- GEDE(test, Est=Est, predictors=predictors, ...)
+    Xhat <- GEDE(test, Est=Est, covariates=covariates.test, predictors=predictors, ...)
   } else if (method=="lasso") {
     Xhat <- Reduce(cbind, mclapply(1:m, function(i) {
       Xi.idx <- setdiff(predictors, i)

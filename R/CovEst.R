@@ -114,7 +114,7 @@ RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vpr
   suppressWarnings( Est0 <- SimpleEst(Yc0, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
   Est0$betahat <- rr0$betahat
   ## 5. Impute missing values 
-  Y1 <- EigenImpute(Est0, Ymiss, covariates=covariates, HD=HD, HD.iter=HD.iter)
+  suppressWarnings( Y1 <- EigenImpute(Est0, Ymiss, covariates=covariates, HD=HD, HD.iter=HD.iter) )
   rr1 <- RobReg(Y1, covariates, return.Yhat=TRUE)
   Y1c <- Y1-rr1$Yhat
   ## 6. Second (final) round of parameter estimation

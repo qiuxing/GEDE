@@ -201,7 +201,7 @@ limma <- function(gdata, v, r=1){
   betahat <- efit$coefficients
   colnames(betahat) <- paste0("betahat.", colnames(betahat))
   ## the adjusted tstats
-  tstats=r*efit$t[,-1, drop=FALSE]
+  tstats=sweep(efit$t[,-1, drop=FALSE], 1, r, "*")
   colnames(tstats) <- paste0("tstat.", colnames(tstats))
   ## p-values computed from tstats
   pvals <- 2*pt(-abs(tstats), df = efit$df.total)

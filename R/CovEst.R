@@ -81,13 +81,13 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
     Tk <- Lk <- NA; sigma2 <- mean(lks); PCs <- NA
   } else { #K >= 1
     if (K>=mstar) {
-      warning("Your K is greater or equal to min(p,n-1), which implies that sigma2=0.  Consider using a smaller K.")
+      warning("Your K is greater or equal to min(m,n-1), which implies that sigma2=0.  Consider using a smaller K.")
       K <- mstar; Tk <- Tmat; Lk <- lks; sigma2 <- 0
     } else { # 0<K<mstar; the main case
       Tk <- Tmat[, 1:K, drop=FALSE]
       ## estimate sigma2 and the first K eigenvalues
       sigma2 <- mstar/(m*(mstar-K)) *(sum(lks[-(1:K)])+l.remain)
-      Lk <- lks[1:K]-m/mstar*sigma2
+      Lk <- pmax(lks[1:K]-m/mstar*sigma2, 0)
     }
     PCs <- Yc%*%Tk
     rownames(PCs) <- rownames(Y); colnames(PCs) <- paste0("PC", 1:K)

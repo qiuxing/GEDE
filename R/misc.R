@@ -170,15 +170,16 @@ createFolds <- function (y, k = 10, list = TRUE, returnTrain = FALSE)
 
 ## To compute the vector of adjustments for t- and F-tests
 t.adj.coef <- function(Est) {
+  n <- nrow(Est$Ystar)
   Tk <- Est$Tk; K <- Est$K; Lk <- Est$Lk; sigma2 <- Est$sigma2
   Tw1 <- sweep(Tk, 2, sqrt(Lk), "*")
   Sigma.jj <- rowSums(Tw1^2)+sigma2
   Tw2 <- sweep(Tk, 2, Lk/sqrt(sigma2+Lk), "*")
   SigmaTilde.jj <- rowSums(Tw2^2)
-  return(sqrt(SigmaTilde.jj/Sigma.jj))
+  ## Try letting the adjustment depend on n
+  r.adj <- sqrt(SigmaTilde.jj/Sigma.jj * n/(n-K))
+  return(r.adj)
 }
-
-
 
 ## limma is a wrapper for eBayes. "v" is a matrix of covariates
 ## WITHOUT the intercept. r is the adjustment coefficient.

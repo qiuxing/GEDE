@@ -49,12 +49,14 @@ mplot <- function(mat, ncolor=100, col.min=NULL, col.max=NULL, ...) {
 
 ## A Hampel filter based on Med +/- 3*MAD criterion for Y_{nxp}.
 Hampel <- function(Y, nMAD=3, arr.ind=FALSE) {
-  ## Ymed <- apply(Y, 2, median, na.rm=TRUE)
-  ## Ymad <- apply(Y, 2, mad, na.rm=TRUE)
-  Ymed <- colMedians(Y, na.rm=TRUE)
-  Ymad <- colMads(Y, na.rm=TRUE)
-  absYc <- abs(sweep(Y, 2, Ymed))
-  out.idx <- which(sweep(absYc, 2, nMAD*Ymad)>0, arr.ind=arr.ind)
+  if (is.null(nMAD)) { #no filter
+    out.idx <- integer(0)
+  } else {
+    Ymed <- colMedians(Y, na.rm=TRUE)
+    Ymad <- colMads(Y, na.rm=TRUE)
+    absYc <- abs(sweep(Y, 2, Ymed))
+    out.idx <- which(sweep(absYc, 2, nMAD*Ymad)>0, arr.ind=arr.ind)
+  }
   return(out.idx)
 }
 
@@ -166,13 +168,31 @@ createFolds <- function (y, k = 10, list = TRUE, returnTrain = FALSE)
   out
 }
 
+## To compute the vector of adjustments for t- and F-tests
+t.adj.coef <- function(Est) {
+  Tk <- Est$Tk; K <- Est$K; Lk <- Est$Lk; sigma2 <- Est$sigma2
+  Tw1 <- sweep(Tk, 2, Lk+sigma2, "*")
+  Sigma.jj <- rowSums(Tw1^2)
+  Tw2 <- sweep(Tk, 2, Lk^2/(sigma2+Lk), "*")
+  SigmaTilde.jj <- rowSums(Tw2^2)
+  return(sqrt(SigmaTilde.jj/Sigma.jj))
+}
+
+
+
 ## limma is a wrapper for eBayes. "v" is a matrix of covariates
-## WITHOUT the intercept.
-limma <- function(gdata, v){
-  v <- as.matrix(v); vn <- colnames(v)
-  if (is.null(vn)) {
-    vn <- paste0("X", 1:ncol(v)); colnames(v) <- vn
-  }
+## WITHOUT the intercept. r is the adjustment coefficient.
+limma <- function(gdata, v, r=1){
+  vn0 <- deparse(substitute(v)) #the object name of v
+  v <- as.matrix(v)
+  if (is.null(colnames(v))) {
+    if (ncol(v)==1){
+      ## use the object name of the input as variable name
+      colnames(v) <- vn0
+    } else {
+      colnames(v) <- paste0("X", 1:ncol(v))
+    }
+  }; vn <- colnames(v)
   ## remove missing samples
   na.id <- apply(v, 1, function(x) any(is.na(x)))
   gdata <- gdata[, !na.id]; v <- v[!na.id,,drop=FALSE]
@@ -180,11 +200,14 @@ limma <- function(gdata, v){
   efit <- eBayes(lmFit(gdata, design.mat))
   betahat <- efit$coefficients
   colnames(betahat) <- paste0("betahat.", colnames(betahat))
-  tstats=efit$t[,-1, drop=FALSE]
+  ## the adjusted tstats
+  tstats=r*efit$t[,-1, drop=FALSE]
   colnames(tstats) <- paste0("tstat.", colnames(tstats))
-  pvals <- efit$p.value[,-1, drop=FALSE]
+  ## p-values computed from tstats
+  pvals <- 2*pt(-abs(tstats), df = efit$df.total)
+  pvals0 <- efit$p.value[,-1, drop=FALSE]
   colnames(pvals) <- paste0("pvals.", vn)
   adjP <- matrix(p.adjust(pvals, "BH"), nrow=nrow(pvals))
   colnames(adjP) <- paste0("adjP.", vn)
-  return(data.frame(betahat, tstats, pvals, adjP))
+  return(data.frame(betahat, tstats, pvals0, pvals, adjP))
 }

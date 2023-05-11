@@ -1,6 +1,6 @@
 ## This is the proposed enhancing function
 GEDE <- function(Y, Est="auto", covariates=NULL, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5, nMAD=2, ...) {
-  if (identical(Est,"auto")) Est <- RobEst(Y, covariates=covariates, HD=HD, HD.iter=HD.iter, ...)
+  if (identical(Est,"auto")) Est <- RobEst(Y, covariates=covariates, HD=HD, HD.iter=HD.iter, nMAD=nMAD, ...)
   Tk <- Est$Tk; Lk <- Est$Lk
   sigma2 <- Est$sigma2; K <- Est$K; n <- nrow(Y)
   ## compute the expected values for the test data (Y)

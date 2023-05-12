@@ -179,36 +179,72 @@ t.adj.coef <- function(Est) {
   return(sqrt(SigmaTilde.jj/Sigma.jj))
 }
 
+## A matrix-valued F-test for comparing two regression models
+RegFtest <- function(Y, X, X0=NULL, include.intercept=TRUE, r.adj=1) {
+  X <- as.matrix(X); n <- nrow(X)
+  if (include.intercept) {
+    X <- cbind(1, X)
+    X0 <- cbind(rep(1,n), X0)
+  }
+  ## fit the alternative model
+  mod1 <- lm.fit(X, Y); p1 <- mod1$rank
+  Yhat1 <- mod1$fitted.values; Res1 <- mod1$residuals
+  ## fit the null model
+  if (is.null(X0)) { #implies no intercept
+    p0 <- 0; Yhat0 <- rep(0, n); Res0 <- Y
+  } else {
+    X0 <- as.matrix(X0)
+    mod0 <- lm.fit(X0, Y); p0 <- mod0$rank
+    Yhat0 <- mod0$fitted.values; Res0 <- mod0$residuals
+  }
+  df1 <- p1-p0; df2 <- mod1$df.residual
+  RSS1 <- colSums(Res1^2); RSS0 <- colSums(Res0^2)
+  Top <- (RSS0-RSS1)/df1; Bottom <- RSS1/df2
+  Bottom.adj <- Bottom/(r.adj^2)
+  F=Top/Bottom.adj; pvals <- 1-pf(F, df1, df2)
+  rr <- data.frame(RSS0=RSS0, RSS1=RSS1, Top=Top, Bottom=Bottom,
+                   Bottom.adj=Bottom.adj, F=F, pvals=pvals)
+  rownames(rr) <- colnames(Y)
+  ## squeeze df1 and df2 into rr as attributes
+  attr(rr, "df1") <- df1; attr(rr, "df2") <- df2
+  return(rr)
+}
 
-
-## limma is a wrapper for eBayes. "v" is a matrix of covariates
-## WITHOUT the intercept. r is the adjustment coefficient.
-limma <- function(gdata, v, r=1){
-  vn0 <- deparse(substitute(v)) #the object name of v
-  v <- as.matrix(v)
-  if (is.null(colnames(v))) {
-    if (ncol(v)==1){
+## limma is a wrapper for eBayes. X is a vector or matrix of
+## covariates (without the intercept by default). r.adj is the
+## adjustment coefficient.
+limma <- function(gdata, X, include.intercept=TRUE, r.adj=1){
+  Xn0 <- deparse(substitute(X)) #the object name of X
+  X <- as.matrix(X)
+  if (is.null(colnames(X))) {
+    if (ncol(X)==1){
       ## use the object name of the input as variable name
-      colnames(v) <- vn0
+      colnames(X) <- Xn0
     } else {
-      colnames(v) <- paste0("X", 1:ncol(v))
+      colnames(X) <- paste0("X", 1:ncol(X))
     }
-  }; vn <- colnames(v)
+  }
   ## remove missing samples
-  na.id <- apply(v, 1, function(x) any(is.na(x)))
-  gdata <- gdata[, !na.id]; v <- v[!na.id,,drop=FALSE]
-  design.mat <- cbind(Intercept=1, v)
-  efit <- eBayes(lmFit(gdata, design.mat))
+  na.id <- apply(X, 1, function(x) any(is.na(x)))
+  gdata <- gdata[, !na.id]; X <- X[!na.id,,drop=FALSE]
+  ## combine with the intercepts
+  if (include.intercept) X <- cbind(Intercept=1, X)
+  ## 
+  efit <- eBayes(lmFit(gdata, X))
   betahat <- efit$coefficients
   colnames(betahat) <- paste0("betahat.", colnames(betahat))
   ## the adjusted tstats
-  tstats=sweep(efit$t[,-1, drop=FALSE], 1, r, "*")
-  colnames(tstats) <- paste0("tstat.", colnames(tstats))
+  if (include.intercept) {
+    tstats=sweep(efit$t[,-1, drop=FALSE], 1, r.adj, "*")
+  } else {
+    tstats=sweep(efit$t, 1, r.adj, "*")
+  }
+  Xn <- colnames(tstats)
+  colnames(tstats) <- paste0("tstat.", Xn)
   ## p-values computed from tstats
   pvals <- 2*pt(-abs(tstats), df = efit$df.total)
-  pvals0 <- efit$p.value[,-1, drop=FALSE]
-  colnames(pvals) <- paste0("pvals.", vn)
+  colnames(pvals) <- paste0("pvals.", Xn)
   adjP <- matrix(p.adjust(pvals, "BH"), nrow=nrow(pvals))
-  colnames(adjP) <- paste0("adjP.", vn)
-  return(data.frame(betahat, tstats, pvals0, pvals, adjP))
+  colnames(adjP) <- paste0("adjP.", Xn)
+  return(data.frame(betahat, tstats, pvals, adjP))
 }

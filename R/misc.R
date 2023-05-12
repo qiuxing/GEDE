@@ -169,12 +169,18 @@ createFolds <- function (y, k = 10, list = TRUE, returnTrain = FALSE)
 }
 
 ## To compute the vector of adjustments for t- and F-tests
-t.adj.coef <- function(Est) {
+t.adj.coef <- function(Est, empirical=TRUE) {
   Tk <- Est$Tk; K <- Est$K; Lk <- Est$Lk
   sigma2 <- Est$sigma2; lks <- Est$lks[1:K]
   Tw1 <- sweep(Tk, 2, sqrt(Lk), "*")
+  ## Sigma.jj are variances for the original data
   Sigma.jj <- rowSums(Tw1^2)+sigma2
-  Tw2 <- sweep(Tk, 2, Lk*sqrt(lks)/(sigma2+Lk), "*")
+  ## SigmaTilde.jj are variances for the enhanced data
+  if (empirical) {
+    Tw2 <- sweep(Tk, 2, Lk*sqrt(lks)/(sigma2+Lk), "*")
+  } else {
+    Tw2 <- sweep(Tk, 2, Lk/sqrt(sigma2+Lk), "*")
+  }
   SigmaTilde.jj <- rowSums(Tw2^2)
   return(sqrt(SigmaTilde.jj/Sigma.jj))
 }

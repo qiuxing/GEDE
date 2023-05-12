@@ -52,7 +52,7 @@ K.est <- function(lks, l.remain, n, m, method=c("REk", "vprop"), vprop=.8) {
 }
 
 ## We assume that Y contains no missing value nor outliers. px: DF of
-## the covariates
+## the X
 SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=200) {
   n <- nrow(Y); m <- ncol(Y); K.method <- match.arg(K.method)
   mstar <- min(m, n-px)
@@ -95,15 +95,15 @@ SimpleEst <- function(Y, y.centered=TRUE, px=1, K="auto", K.method=c("REk", "vpr
   return(list(mumat=mumat, lks=lks, l.remain=l.remain, varprops=varprops, Tk=Tk, K=K, Lk=Lk, sigma2=sigma2, PCs=PCs))
 }
 
-## covariates must be numeric
-RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=200, nMAD=2, HD=FALSE, HD.iter=5) {
+## X must be numeric
+RobEst <- function(Y, X=NULL, K="auto", K.method=c("REk", "vprop"), vprop=0.8, Kmax=200, nMAD=2, HD=FALSE, HD.iter=5) {
   n <- nrow(Y); m <- ncol(Y)
   ## 1. Initial outlier removal
   out.idx <- Hampel(Y, nMAD=nMAD)
   Ymiss <- Y; Ymiss[out.idx] <- NA
   ## 2. Estimate the mean values by a robust and fast regression function
-  rr0 <- RobReg(Y, covariates, return.Yhat=TRUE)
-  px <- nrow(rr0$betahat) #number of covariates, including the intercept
+  rr0 <- RobReg(Y, X, return.Yhat=TRUE)
+  px <- nrow(rr0$betahat) #number of X, including the intercept
   ## 3. Initial parameter estimation based on Yc0
   Yc0 <- Ymiss-rr0$Yhat
   ## 4. Second round of outlier removal applied to Yc0
@@ -114,8 +114,8 @@ RobEst <- function(Y, covariates=NULL, K="auto", K.method=c("REk", "vprop"), vpr
   suppressWarnings( Est0 <- SimpleEst(Yc0, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax) )
   Est0$betahat <- rr0$betahat
   ## 5. Impute missing values 
-  suppressWarnings( Y1 <- EigenImpute(Est0, Ymiss, covariates=covariates, HD=HD, HD.iter=HD.iter) )
-  rr1 <- RobReg(Y1, covariates, return.Yhat=TRUE)
+  suppressWarnings( Y1 <- EigenImpute(Est0, Ymiss, X=X, HD=HD, HD.iter=HD.iter) )
+  rr1 <- RobReg(Y1, X, return.Yhat=TRUE)
   Y1c <- Y1-rr1$Yhat
   ## 6. Second (final) round of parameter estimation
   Est1 <- SimpleEst(Y1c, px=px, K=K, K.method=K.method, vprop=vprop, Kmax=Kmax)

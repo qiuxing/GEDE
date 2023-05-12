@@ -2,26 +2,26 @@
 ## Below starts the main functions
 ################################################################################
 
-## 05/01/2023. RobMod() needs to be re-written to deal with covariates
+## 05/01/2023. RobMod() needs to be re-written to deal with X
 
 
 ## this function produces regression-like linear predictors of Y given
-## X, based on the initial mean/covariance estimator provided by
+## Pred, based on the initial mean/covariance estimator provided by
 ## RobEst() or a compatible method.  EstObj must be a list that
-## contains: K, muhat, Tk, Lk, and sigma2.  Xlist is a *list* of the
-## indices of covariates.  It returns a list of linear predictive
+## contains: K, muhat, Tk, Lk, and sigma2.  Predlist is a *list* of the
+## indices of X.  It returns a list of linear predictive
 ## models that can be used in different applications such as
 ## EigenImpute() and GenePred().
-RobMod <- function(EstObj, Xlist) {
+RobMod <- function(EstObj, Predlist) {
   K <- EstObj$K; muhat <- EstObj$muhat
   Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
   mods <- list()
   if (K==0) {
     warning("K=0 means all variables are independent therefore the best estimations are marginal means.")
-    for (j in 1:length(Xlist)){
-      Xj <- Xlist[[j]]
-      beta1.j <- matrix(0, nrow=p-length(Xj), ncol=length(Xj))
-      beta0.j <- muhat[-Xj]
+    for (j in 1:length(Predlist)){
+      Pred.j <- Predlist[[j]]
+      beta1.j <- matrix(0, nrow=p-length(Pred.j), ncol=length(Pred.j))
+      beta0.j <- muhat[-Pred.j]
       mods[[j]] <- list(beta0=beta0.j, beta1=beta1.j)
     }
   } else if (K==1) {
@@ -29,10 +29,10 @@ RobMod <- function(EstObj, Xlist) {
     ## Lk is a number, so we must use special care to deal with it;
     ## (b) there exists a simple numerical shortcut (see my report)
     ## for this case.
-    for (j in 1:length(Xlist)){
-      Xj <- Xlist[[j]]
-      muhat2 <- muhat[Xj]; muhat1 <- muhat[-Xj]
-      Tk2 <- Tk[Xj,,drop=FALSE]; Tk1 <- Tk[-Xj,,drop=FALSE]
+    for (j in 1:length(Predlist)){
+      Pred.j <- Predlist[[j]]
+      muhat2 <- muhat[Pred.j]; muhat1 <- muhat[-Pred.j]
+      Tk2 <- Tk[Pred.j,,drop=FALSE]; Tk1 <- Tk[-Pred.j,,drop=FALSE]
       ## d12 is d1^2 in Equation(9)
       d12 <- sum(Tk2^2)
       beta1.j <- Lk/(d12 + sigma2) * (Tk1 %*% t(Tk2))
@@ -40,10 +40,10 @@ RobMod <- function(EstObj, Xlist) {
       mods[[j]] <- list(beta0=beta0.j, beta1=beta1.j)
     }
   } else {
-    for (j in 1:length(Xlist)) {
-      Xj <- Xlist[[j]]
-      muhat2 <- muhat[Xj]; muhat1 <- muhat[-Xj]
-      Tk2 <- Tk[Xj,,drop=FALSE]; Tk1 <- Tk[-Xj,,drop=FALSE]
+    for (j in 1:length(Predlist)) {
+      Pred.j <- Predlist[[j]]
+      muhat2 <- muhat[Pred.j]; muhat1 <- muhat[-Pred.j]
+      Tk2 <- Tk[Pred.j,,drop=FALSE]; Tk1 <- Tk[-Pred.j,,drop=FALSE]
       Tk1b <- sweep(Tk1, 2, sqrt(Lk), "*")
       Tk2b <- sweep(Tk2, 2, sqrt(Lk), "*")
       ss <- svd(Tk2b)
@@ -70,7 +70,7 @@ RobMod <- function(EstObj, Xlist) {
 
 ## 04/17/2023. A much more memory-efficient algorithm. HD: an
 ## iterative algorithm that runs faster for high-dim data
-EigenImpute <- function(EstObj, Ymiss, covariates=NULL, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5) {
+EigenImpute <- function(EstObj, Ymiss, X=NULL, predictors=seq(1:ncol(Y)), HD=FALSE, HD.iter=5) {
   ## if no missing, we just return Ymiss
   NA.idx <- which(is.na(Ymiss))
   if (length(NA.idx)==0) {
@@ -82,17 +82,17 @@ EigenImpute <- function(EstObj, Ymiss, covariates=NULL, predictors=seq(1:ncol(Y)
   Tk <- EstObj$Tk; Lk <- EstObj$Lk; sigma2 <- EstObj$sigma2
   n <- nrow(Ymiss); m <- ncol(Ymiss)
   ## gather the information about locations of non-missing data
-  Xlist0 <- apply(Ymiss, 1, function(x) which(!is.na(x)))
+  Predlist0 <- apply(Ymiss, 1, function(x) which(!is.na(x)))
   ## nx is the number of non-missing variables for each sample
-  nx <- sapply(Xlist0, length)
+  nx <- sapply(Predlist0, length)
   ## we only need to impute for incomplete samples
   incomplete.cases <- which(nx<m)
-  Xlist <- Xlist0[incomplete.cases]
+  Predlist <- Predlist0[incomplete.cases]
   ## Yc is the centered data to be imputed
-  if (is.null(covariates)) { #only use the intercept
+  if (is.null(X)) { #only use the intercept
     mumat <- rep(1,n)%*%t(betahat[1,])
   } else {
-    mumat <- cbind(1, covariates)%*%betahat
+    mumat <- cbind(1, X)%*%betahat
   }
   Yc <- Ymiss-mumat
   if (K==0) {
@@ -115,10 +115,10 @@ EigenImpute <- function(EstObj, Ymiss, covariates=NULL, predictors=seq(1:ncol(Y)
     } else { #the slower but more accurate approach
       for (i in 1:length(incomplete.cases)){
         i0 <- incomplete.cases[i]
-        Xi <- intersect(Xlist[[i]], predictors)
+        Predi <- intersect(Predlist[[i]], predictors)
         NA.idx.i <- which(is.na(Yc[i0,]))
-        y2c <- Yc[i0,Xi] #this is a vector
-        Tk2 <- Tk[Xi,,drop=FALSE]; Tk1 <- Tk[NA.idx.i,,drop=FALSE]
+        y2c <- Yc[i0,Predi] #this is a vector
+        Tk2 <- Tk[Predi,,drop=FALSE]; Tk1 <- Tk[NA.idx.i,,drop=FALSE]
         if (K==1) { #a special computational shortcut
           d12 <- sum(Tk2^2)
           Yc[i0, NA.idx.i] <- Lk/(d12 + sigma2)*sum(Tk2*y2c)*Tk1

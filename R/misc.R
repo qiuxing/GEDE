@@ -221,7 +221,7 @@ RegFtest <- function(Y, X, X0=NULL, include.intercept=TRUE, r.adj=1) {
 ## adjustment coefficient.
 limma <- function(gdata, X, include.intercept=TRUE, r.adj=1){
   Xn0 <- deparse(substitute(X)) #the object name of X
-  X <- as.matrix(X)
+  X <- as.matrix(X); n <- nrow(X)
   if (is.null(colnames(X))) {
     if (ncol(X)==1){
       ## use the object name of the input as variable name
@@ -233,24 +233,35 @@ limma <- function(gdata, X, include.intercept=TRUE, r.adj=1){
   ## remove missing samples
   na.id <- apply(X, 1, function(x) any(is.na(x)))
   gdata <- gdata[, !na.id]; X <- X[!na.id,,drop=FALSE]
-  ## combine with the intercepts
-  if (include.intercept) X <- cbind(Intercept=1, X)
-  ## 
-  efit <- eBayes(lmFit(gdata, X))
+  if (include.intercept) {
+    ## We use FWL theorem to control for the effect of intercepts
+    gdata.c <- sweep(gdata, 1, rowMeans(gdata))
+    Xc <- sweep(X, 2, colMeans(X))
+    efit <- eBayes(lmFit(gdata.c, Xc))
+    ## degrees of freedoms, accounting for centering. Note that df1 is
+    ## just efit$rank because the DF of the top of F is (efit$rank+1)
+    ## - DF(mod0), where the DF of the null model (mod0) is 1.
+    df2 <- efit$df.residual-1; df.total <- efit$df.total-1
+  } else { 
+    ## mean values will be reflected in F-stats (this is usually not
+    ## what you want!!)
+    efit <- eBayes(lmFit(gdata, X))
+    df2 <- efit$df.residual; df.total <- efit$df.total
+  }
   betahat <- efit$coefficients
   colnames(betahat) <- paste0("betahat.", colnames(betahat))
-  ## the adjusted tstats
-  if (include.intercept) {
-    tstats=sweep(efit$t[,-1, drop=FALSE], 1, r.adj, "*")
-  } else {
-    tstats=sweep(efit$t, 1, r.adj, "*")
-  }
+  ## the *adjusted* t- and F-stats 
+  tstats <- sweep(efit$t, 1, r.adj, "*")
+  F <- efit$F*(r.adj^2)
   Xn <- colnames(tstats)
-  colnames(tstats) <- paste0("tstat.", Xn)
-  ## p-values computed from tstats
-  pvals <- 2*pt(-abs(tstats), df = efit$df.total)
-  colnames(pvals) <- paste0("pvals.", Xn)
-  adjP <- matrix(p.adjust(pvals, "BH"), nrow=nrow(pvals))
-  colnames(adjP) <- paste0("adjP.", Xn)
-  return(data.frame(betahat, tstats, pvals, adjP))
+  colnames(tstats) <- paste0("t.", Xn)
+  ## p-values computed from t- and F-stats
+  t.p <- 2*pt(-abs(tstats), df = efit$df.total)
+  colnames(t.p) <- paste0("t.p.", Xn)
+  t.adjp <- matrix(p.adjust(t.p, "BH"), nrow=nrow(t.p))
+  colnames(t.adjp) <- paste0("t.adjp.", Xn)
+  ##
+  F.p <- pf(F, df1=efit$rank, df2=df2, lower.tail=FALSE)
+  F.adjp <- p.adjust(F.p, "BH")
+  return(data.frame(betahat, tstats, t.p, t.adjp, F, F.p, F.adjp))
 }
